@@ -1,4 +1,6 @@
 # ServiceDesk
+[![CI](https://github.com/EricNahuel2002/ServiceDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/EricNahuel2002/ServiceDesk/actions/workflows/ci.yml)
+
 ServiceDesk es una plataforma SaaS para gestionar incidencias, mantenimiento y soporte técnico de empresas.
 
 # Objetivo
