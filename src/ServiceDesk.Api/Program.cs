@@ -1,6 +1,7 @@
 using ServiceDesk.Api.Middleware;
 using ServiceDesk.Application;
 using ServiceDesk.Infrastructure;
+using ServiceDesk.Infrastructure.Persistence.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,10 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    using IServiceScope scope = app.Services.CreateScope();
+    ServiceDeskDbInitializer initializer = scope.ServiceProvider.GetRequiredService<ServiceDeskDbInitializer>();
+    await initializer.SeedAsync();
 }
 
 app.UseHttpsRedirection();
