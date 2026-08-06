@@ -9,22 +9,22 @@ Desarrollar una API REST empresarial en ASP.NET Core utilizando servicios de Azu
 
 Backend
 
-ASP.NET Core Web API
-Entity Framework Core
-SQL Server
-JWT
-FluentValidation
-AutoMapper
-Serilog
-xUnit
+*  ASP.NET Core Web API
+-  Entity Framework Core
+*  SQL Server
+*  JWT
+*  FluentValidation
+*  AutoMapper
+*  Serilog
+*  xUnit
 
 Azure
 
-App Service
-Azure SQL Database
-Blob Storage
-Key Vault
-Application Insights
-Queue Storage
-Azure Functions
-GitHub Actions
+*  App Service
+*  Azure SQL Database
+*  Blob Storage
+*  Key Vault
+*  Application Insights
+*  Queue Storage
+*  Azure Functions
+*  GitHub Actions
