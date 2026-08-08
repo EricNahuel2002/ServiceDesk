@@ -17,6 +17,8 @@ public class TicketAttachment : BaseEntity
 
     public long SizeInBytes { get; set; }
 
+    public byte[] Content { get; set; } = [];
+
     public Ticket? Ticket { get; set; }
 
     public ApplicationUser? UploadedBy { get; set; }

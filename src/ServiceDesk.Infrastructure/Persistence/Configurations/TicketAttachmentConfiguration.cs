@@ -20,6 +20,10 @@ public sealed class TicketAttachmentConfiguration : IEntityTypeConfiguration<Tic
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(a => a.Content)
+            .HasColumnType("varbinary(max)")
+            .IsRequired();
+
         builder.HasIndex(a => a.TicketId);
         builder.HasIndex(a => a.UploadedById);
 

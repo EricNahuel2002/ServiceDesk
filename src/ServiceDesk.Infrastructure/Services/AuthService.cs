@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ServiceDesk.Application.Common.Exceptions;
 using ServiceDesk.Application.Common.Interfaces;
+using ServiceDesk.Application.Common.Validation;
 using ServiceDesk.Application.DTOs.Auth;
 using ServiceDesk.Domain.Identity;
 using ServiceDesk.Infrastructure.Configuration;
@@ -53,7 +54,7 @@ public sealed class AuthService : IAuthService
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken)
     {
-        await ValidateAsync(_registerValidator, request, cancellationToken);
+        await ValidationHelper.ValidateAsync(_registerValidator, request, cancellationToken);
 
         await EnsureCompanyExistsAsync(request.CompanyId, cancellationToken);
 
@@ -71,7 +72,7 @@ public sealed class AuthService : IAuthService
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
     {
-        await ValidateAsync(_loginValidator, request, cancellationToken);
+        await ValidationHelper.ValidateAsync(_loginValidator, request, cancellationToken);
 
         ApplicationUser? user = await _userManager.FindByEmailAsync(request.Email);
 
@@ -90,7 +91,7 @@ public sealed class AuthService : IAuthService
 
     public async Task<AuthResponse> RefreshAsync(RefreshTokenRequest request, CancellationToken cancellationToken)
     {
-        await ValidateAsync(_refreshTokenValidator, request, cancellationToken);
+        await ValidationHelper.ValidateAsync(_refreshTokenValidator, request, cancellationToken);
 
         string presentedTokenHash = HashToken(request.RefreshToken);
 
@@ -119,7 +120,7 @@ public sealed class AuthService : IAuthService
 
     public async Task<AuthResponse> CreateUserAsync(AdminCreateUserRequest request, CancellationToken cancellationToken)
     {
-        await ValidateAsync(_adminCreateUserValidator, request, cancellationToken);
+        await ValidationHelper.ValidateAsync(_adminCreateUserValidator, request, cancellationToken);
 
         await EnsureCompanyExistsAsync(request.CompanyId, cancellationToken);
 
@@ -142,7 +143,7 @@ public sealed class AuthService : IAuthService
 
     public async Task LogoutAsync(LogoutRequest request, CancellationToken cancellationToken)
     {
-        await ValidateAsync(_logoutValidator, request, cancellationToken);
+        await ValidationHelper.ValidateAsync(_logoutValidator, request, cancellationToken);
 
         string tokenHash = HashToken(request.RefreshToken);
 
@@ -261,20 +262,6 @@ public sealed class AuthService : IAuthService
         if (!exists)
         {
             throw new NotFoundException($"La empresa con id {companyId} no existe.");
-        }
-    }
-
-    private static async Task ValidateAsync<T>(IValidator<T> validator, T request, CancellationToken cancellationToken)
-    {
-        FluentValidation.Results.ValidationResult result = await validator.ValidateAsync(request, cancellationToken);
-
-        if (!result.IsValid)
-        {
-            IReadOnlyDictionary<string, string[]> errors = result.Errors
-                .GroupBy(e => e.PropertyName)
-                .ToDictionary(group => group.Key, group => group.Select(e => e.ErrorMessage).ToArray());
-
-            throw new ValidationException(errors);
         }
     }
 
