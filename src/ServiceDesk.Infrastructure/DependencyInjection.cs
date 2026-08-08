@@ -71,6 +71,7 @@ public static class DependencyInjection
             .AddPolicy(AuthPolicies.RequireCliente, policy => policy.RequireRole(Roles.Cliente));
 
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ServiceDeskDbInitializer>();
 
         return services;
