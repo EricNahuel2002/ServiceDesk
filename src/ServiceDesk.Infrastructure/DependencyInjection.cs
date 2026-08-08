@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ServiceDesk.Domain.Identity;
 using ServiceDesk.Infrastructure.Persistence;
 using ServiceDesk.Infrastructure.Persistence.Seed;
+using ServiceDesk.Infrastructure.Services;
 
 namespace ServiceDesk.Infrastructure;
 
@@ -31,6 +32,7 @@ public static class DependencyInjection
             .AddRoles<ApplicationRole>()
             .AddEntityFrameworkStores<ServiceDeskDbContext>();
 
+        services.AddScoped<IPasswordHasher<ApplicationUser>, BcryptPasswordHasher>();
         services.AddScoped<ServiceDeskDbInitializer>();
 
         return services;
