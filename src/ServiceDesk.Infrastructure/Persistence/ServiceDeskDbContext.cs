@@ -35,6 +35,8 @@ public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
