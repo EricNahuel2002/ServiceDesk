@@ -105,6 +105,18 @@ public sealed class TicketService : ITicketService
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TicketDto>> GetMineAsync(CancellationToken cancellationToken)
+    {
+        List<TicketDto> tickets = await _context.Tickets
+            .AsNoTracking()
+            .Where(ticket => ticket.CreatedById == _currentUser.UserId)
+            .OrderByDescending(ticket => ticket.CreatedAtUtc)
+            .Select(TicketProjection)
+            .ToListAsync(cancellationToken);
+
+        return tickets;
+    }
+
     private async Task<TicketDto> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         TicketDto? ticket = await _context.Tickets

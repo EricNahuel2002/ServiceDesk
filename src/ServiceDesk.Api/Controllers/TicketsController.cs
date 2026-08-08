@@ -34,7 +34,18 @@ public sealed class TicketsController : ControllerBase
 
         TicketDto ticket = await _ticketService.CreateAsync(requestWithFiles, cancellationToken);
 
-        return Created("/api/tickets", ticket);
+        return CreatedAtAction(nameof(GetMine), new { }, ticket);
+    }
+
+    [HttpGet]
+    [ProducesResponseType(typeof(IReadOnlyList<TicketDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<IReadOnlyList<TicketDto>>> GetMine(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<TicketDto> tickets = await _ticketService.GetMineAsync(cancellationToken);
+
+        return Ok(tickets);
     }
 
     private static async Task<List<TicketFileUpload>> ReadFilesAsync(
