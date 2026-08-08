@@ -30,15 +30,29 @@ public sealed class ServiceDeskDbInitializer
     {
         await _context.Database.MigrateAsync(cancellationToken);
 
-        if (await _context.Companies.AnyAsync(cancellationToken))
+        await SeedRolesAsync(cancellationToken);
+
+        if (!await _context.Companies.AnyAsync(cancellationToken))
         {
-            return;
+            await SeedCompanyAsync(cancellationToken);
         }
 
-        await SeedCompanyAsync(cancellationToken);
-        await SeedDemoAdminAsync(cancellationToken);
+        await SeedDemoUsersAsync(cancellationToken);
 
         _logger.LogInformation("Datos demo sembrados correctamente.");
+    }
+
+    private async Task SeedRolesAsync(CancellationToken cancellationToken)
+    {
+        foreach (string roleName in Roles.All)
+        {
+            if (await _roleManager.FindByNameAsync(roleName) is null)
+            {
+                IdentityResult result = await _roleManager.CreateAsync(new ApplicationRole(roleName));
+
+                ThrowIfFailed(result, $"No se pudo crear el rol {roleName}.");
+            }
+        }
     }
 
     private async Task SeedCompanyAsync(CancellationToken cancellationToken)
@@ -74,41 +88,84 @@ public sealed class ServiceDeskDbInitializer
         await _context.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task SeedDemoAdminAsync(CancellationToken cancellationToken)
+    private async Task SeedDemoUsersAsync(CancellationToken cancellationToken)
     {
-        if (await _roleManager.FindByNameAsync("Administrator") is null)
-        {
-            throw new InvalidOperationException("El rol Administrator debe existir antes de sembrar el usuario admin.");
-        }
-
         Company company = await _context.Companies
-            .FirstAsync(c => c.Name == "Contoso S.A.", cancellationToken);
+            .OrderBy(c => c.CreatedAtUtc)
+            .FirstAsync(cancellationToken);
 
-        var admin = new ApplicationUser
+        await SeedUserIfNeededAsync(
+            "admin@servicedesk.local",
+            "Admin",
+            "ServiceDesk",
+            "Admin*123456",
+            Roles.Administrador,
+            company,
+            cancellationToken);
+
+        await SeedUserIfNeededAsync(
+            "tecnico@servicedesk.local",
+            "Tecnico",
+            "ServiceDesk",
+            "Tecnico*123456",
+            Roles.Tecnico,
+            company,
+            cancellationToken);
+
+        await SeedUserIfNeededAsync(
+            "cliente@servicedesk.local",
+            "Cliente",
+            "ServiceDesk",
+            "Cliente*123456",
+            Roles.Cliente,
+            company,
+            cancellationToken);
+    }
+
+    private async Task SeedUserIfNeededAsync(
+        string email,
+        string firstName,
+        string lastName,
+        string password,
+        string role,
+        Company company,
+        CancellationToken cancellationToken)
+    {
+        ApplicationUser? user = await _userManager.FindByEmailAsync(email);
+
+        if (user is null)
         {
-            UserName = "admin@servicedesk.local",
-            Email = "admin@servicedesk.local",
-            FirstName = "Admin",
-            LastName = "ServiceDesk",
-            CompanyId = company.Id,
-            EmailConfirmed = true,
-            IsActive = true
-        };
+            user = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                FirstName = firstName,
+                LastName = lastName,
+                CompanyId = company.Id,
+                EmailConfirmed = true,
+                IsActive = true
+            };
 
-        IdentityResult result = await _userManager.CreateAsync(admin, "Admin*123456");
+            IdentityResult createResult = await _userManager.CreateAsync(user, password);
 
-        if (!result.Succeeded)
+            ThrowIfFailed(createResult, $"No se pudo crear el usuario demo {email}.");
+        }
+        else if (!await _userManager.CheckPasswordAsync(user, password))
         {
-            throw new InvalidOperationException(
-                $"No se pudo crear el usuario admin: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+            IdentityResult removeResult = await _userManager.RemovePasswordAsync(user);
+
+            ThrowIfFailed(removeResult, $"No se pudo remover la contraseña del usuario demo {email}.");
+
+            IdentityResult addResult = await _userManager.AddPasswordAsync(user, password);
+
+            ThrowIfFailed(addResult, $"No se pudo restablecer la contraseña del usuario demo {email}.");
         }
 
-        IdentityResult roleResult = await _userManager.AddToRoleAsync(admin, "Administrator");
-
-        if (!roleResult.Succeeded)
+        if (!await _userManager.IsInRoleAsync(user, role))
         {
-            throw new InvalidOperationException(
-                $"No se pudo asignar el rol al usuario admin: {string.Join(", ", roleResult.Errors.Select(e => e.Description))}");
+            IdentityResult roleResult = await _userManager.AddToRoleAsync(user, role);
+
+            ThrowIfFailed(roleResult, $"No se pudo asignar el rol {role} al usuario demo {email}.");
         }
     }
 
@@ -120,4 +177,13 @@ public sealed class ServiceDeskDbInitializer
 
     private static Status CreateStatus(Company company, string name, int sortOrder, bool isClosed = false) =>
         new() { CompanyId = company.Id, Name = name, SortOrder = sortOrder, IsClosed = isClosed, IsActive = true };
+
+    private static void ThrowIfFailed(IdentityResult result, string message)
+    {
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"{message} {string.Join(", ", result.Errors.Select(e => e.Description))}");
+        }
+    }
 }
