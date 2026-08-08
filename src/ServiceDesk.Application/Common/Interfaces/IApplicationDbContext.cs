@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Companies;
+using ServiceDesk.Domain.Identity;
 using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Application.Common.Interfaces;
@@ -23,6 +24,8 @@ public interface IApplicationDbContext
     DbSet<Status> Statuses { get; }
 
     DbSet<AuditLog> AuditLogs { get; }
+
+    DbSet<RefreshToken> RefreshTokens { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
