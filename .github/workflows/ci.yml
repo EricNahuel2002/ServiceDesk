@@ -11,6 +11,21 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
 
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "ServiceDesk_Test_SA_2026!"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'ServiceDesk_Test_SA_2026!' -C -Q 'SELECT 1' -b"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,6 +50,8 @@ jobs:
         run: dotnet build ServiceDesk.sln --no-restore --configuration Release
 
       - name: Test
+        env:
+          ServiceDesk__TestConnectionString: "Server=localhost,1433;Database=ServiceDesk_Test;User Id=sa;Password=ServiceDesk_Test_SA_2026!;TrustServerCertificate=True;MultipleActiveResultSets=true"
         run: dotnet test ServiceDesk.sln --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory "${{ github.workspace }}/TestResults"
 
       - name: Upload coverage report

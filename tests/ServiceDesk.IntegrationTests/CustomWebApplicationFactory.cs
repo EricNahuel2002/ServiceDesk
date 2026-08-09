@@ -19,8 +19,12 @@ namespace ServiceDesk.IntegrationTests;
 
 public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
-    public const string TestConnectionString =
+    private const string DefaultTestConnectionString =
         "Server=.\\SQLEXPRESS;Database=ServiceDesk_Test;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true";
+
+    public static string TestConnectionString =>
+        Environment.GetEnvironmentVariable("ServiceDesk__TestConnectionString")
+        ?? DefaultTestConnectionString;
 
     public const string SeedCompanyName = "Contoso S.A.";
 
