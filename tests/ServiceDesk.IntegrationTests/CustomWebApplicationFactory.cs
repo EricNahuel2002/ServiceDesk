@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Common;
@@ -34,18 +33,12 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.ConfigureAppConfiguration((_, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
-                ["Jwt:Issuer"] = "ServiceDesk.Tests",
-                ["Jwt:Audience"] = "ServiceDesk.Tests.Clients",
-                ["Jwt:SecretKey"] = "TestSecretKey_AtLeast32Characters_LongEnough_123456",
-                ["Jwt:AccessTokenExpirationMinutes"] = "15",
-                ["Jwt:RefreshTokenExpirationDays"] = "7"
-            });
-        });
+        builder.UseSetting("ConnectionStrings:DefaultConnection", TestConnectionString);
+        builder.UseSetting("Jwt:Issuer", "ServiceDesk.Tests");
+        builder.UseSetting("Jwt:Audience", "ServiceDesk.Tests.Clients");
+        builder.UseSetting("Jwt:SecretKey", "TestSecretKey_AtLeast32Characters_LongEnough_123456");
+        builder.UseSetting("Jwt:AccessTokenExpirationMinutes", "15");
+        builder.UseSetting("Jwt:RefreshTokenExpirationDays", "7");
     }
 
     public async Task<HttpClient> CreateClientForAsync(string email, string password)
