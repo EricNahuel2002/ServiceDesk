@@ -1,9 +1,12 @@
+using System.Linq.Expressions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ServiceDesk.Domain.Catalog;
+using ServiceDesk.Domain.Common;
 using ServiceDesk.Domain.Companies;
 using ServiceDesk.Domain.Identity;
+using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Infrastructure.Persistence.Seed;
 
@@ -38,6 +41,8 @@ public sealed class ServiceDeskDbInitializer
         }
 
         await SeedDemoUsersAsync(cancellationToken);
+
+        await SeedDemoTicketsAsync(cancellationToken);
 
         _logger.LogInformation("Datos demo sembrados correctamente.");
     }
@@ -121,6 +126,165 @@ public sealed class ServiceDeskDbInitializer
             company,
             cancellationToken);
     }
+
+    private async Task SeedDemoTicketsAsync(CancellationToken cancellationToken)
+    {
+        Company company = await _context.Companies
+            .OrderBy(c => c.CreatedAtUtc)
+            .FirstAsync(cancellationToken);
+
+        bool hasTickets = await _context.Tickets
+            .AnyAsync(ticket => ticket.CompanyId == company.Id, cancellationToken);
+
+        if (hasTickets)
+        {
+            return;
+        }
+
+        ApplicationUser cliente = await GetUserByEmailAsync("cliente@servicedesk.local", cancellationToken);
+        ApplicationUser tecnico = await GetUserByEmailAsync("tecnico@servicedesk.local", cancellationToken);
+
+        Guid hardwareId = await FindCatalogIdAsync(
+            _context.Categories,
+            category => category.CompanyId == company.Id && category.Name == "Hardware",
+            cancellationToken);
+
+        Guid softwareId = await FindCatalogIdAsync(
+            _context.Categories,
+            category => category.CompanyId == company.Id && category.Name == "Software",
+            cancellationToken);
+
+        Guid redId = await FindCatalogIdAsync(
+            _context.Categories,
+            category => category.CompanyId == company.Id && category.Name == "Red",
+            cancellationToken);
+
+        Guid bajaId = await FindCatalogIdAsync(
+            _context.Priorities,
+            priority => priority.CompanyId == company.Id && priority.Name == "Baja",
+            cancellationToken);
+
+        Guid mediaId = await FindCatalogIdAsync(
+            _context.Priorities,
+            priority => priority.CompanyId == company.Id && priority.Name == "Media",
+            cancellationToken);
+
+        Guid altaId = await FindCatalogIdAsync(
+            _context.Priorities,
+            priority => priority.CompanyId == company.Id && priority.Name == "Alta",
+            cancellationToken);
+
+        Guid nuevoId = await FindCatalogIdAsync(
+            _context.Statuses,
+            status => status.CompanyId == company.Id && status.Name == "Nuevo",
+            cancellationToken);
+
+        Guid enProgresoId = await FindCatalogIdAsync(
+            _context.Statuses,
+            status => status.CompanyId == company.Id && status.Name == "En Progreso",
+            cancellationToken);
+
+        Guid resueltoId = await FindCatalogIdAsync(
+            _context.Statuses,
+            status => status.CompanyId == company.Id && status.Name == "Resuelto",
+            cancellationToken);
+
+        _context.Tickets.AddRange(
+            CreateTicket(
+                company.Id,
+                cliente.Id,
+                hardwareId,
+                mediaId,
+                nuevoId,
+                "PC no enciende",
+                "La PC de recepción no enciende desde esta mañana."),
+            CreateTicket(
+                company.Id,
+                cliente.Id,
+                redId,
+                altaId,
+                enProgresoId,
+                "VPN no funciona",
+                "No puedo conectarme a la VPN desde casa.",
+                assignedToId: tecnico.Id),
+            CreateTicket(
+                company.Id,
+                cliente.Id,
+                hardwareId,
+                mediaId,
+                resueltoId,
+                "Impresora no imprime",
+                "La impresora del piso 3 quedó con un atasco de papel.",
+                assignedToId: tecnico.Id,
+                resolved: true),
+            CreateTicket(
+                company.Id,
+                cliente.Id,
+                softwareId,
+                bajaId,
+                nuevoId,
+                "Solicitud de licencia",
+                "Necesito una licencia de Microsoft 365 para el equipo de ventas."));
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Tickets demo sembrados.");
+    }
+
+    private async Task<ApplicationUser> GetUserByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        ApplicationUser? user = await _userManager.FindByEmailAsync(email);
+
+        if (user is null)
+        {
+            throw new InvalidOperationException($"No se encontró el usuario demo {email}.");
+        }
+
+        return user;
+    }
+
+    private static async Task<Guid> FindCatalogIdAsync<TEntity>(
+        IQueryable<TEntity> entities,
+        Expression<Func<TEntity, bool>> predicate,
+        CancellationToken cancellationToken)
+        where TEntity : BaseEntity
+    {
+        Guid? id = await entities
+            .Where(predicate)
+            .Select(item => (Guid?)item.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (id is null)
+        {
+            throw new InvalidOperationException("No se encontró un catálogo requerido para la empresa demo.");
+        }
+
+        return id.Value;
+    }
+
+    private static Ticket CreateTicket(
+        Guid companyId,
+        Guid createdById,
+        Guid categoryId,
+        Guid priorityId,
+        Guid statusId,
+        string title,
+        string description,
+        Guid? assignedToId = null,
+        bool resolved = false) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyId,
+            CreatedById = createdById,
+            CategoryId = categoryId,
+            PriorityId = priorityId,
+            StatusId = statusId,
+            Title = title,
+            Description = description,
+            AssignedToId = assignedToId,
+            ResolvedAtUtc = resolved ? DateTime.UtcNow : null
+        };
 
     private async Task SeedUserIfNeededAsync(
         string email,
