@@ -1,4 +1,5 @@
 using Microsoft.OpenApi;
+using Scalar.AspNetCore;
 using ServiceDesk.Api.Middleware;
 using ServiceDesk.Application;
 using ServiceDesk.Infrastructure;
@@ -35,8 +36,10 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
+    app.UseSwagger(options => options.RouteTemplate = "/openapi/{documentName}.json");
     app.UseSwaggerUI();
+
+    app.MapScalarApiReference();
 
     using IServiceScope scope = app.Services.CreateScope();
     ServiceDeskDbInitializer initializer = scope.ServiceProvider.GetRequiredService<ServiceDeskDbInitializer>();
