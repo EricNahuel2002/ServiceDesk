@@ -34,16 +34,16 @@ var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
+using IServiceScope scope = app.Services.CreateScope();
+ServiceDeskDbInitializer initializer = scope.ServiceProvider.GetRequiredService<ServiceDeskDbInitializer>();
+await initializer.SeedAsync();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger(options => options.RouteTemplate = "/openapi/{documentName}.json");
     app.UseSwaggerUI();
 
     app.MapScalarApiReference();
-
-    using IServiceScope scope = app.Services.CreateScope();
-    ServiceDeskDbInitializer initializer = scope.ServiceProvider.GetRequiredService<ServiceDeskDbInitializer>();
-    await initializer.SeedAsync();
 }
 
 app.UseHttpsRedirection();
