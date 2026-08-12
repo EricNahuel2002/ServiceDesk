@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Catalog;
@@ -10,6 +11,12 @@ namespace ServiceDesk.Application.Common.Interfaces;
 public interface IApplicationDbContext
 {
     DbSet<Company> Companies { get; }
+
+    DbSet<ApplicationUser> Users { get; }
+
+    DbSet<ApplicationRole> Roles { get; }
+
+    DbSet<IdentityUserRole<Guid>> UserRoles { get; }
 
     DbSet<Ticket> Tickets { get; }
 

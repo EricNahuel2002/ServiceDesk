@@ -1,6 +1,5 @@
 using System.Linq.Expressions;
 using FluentValidation;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ServiceDesk.Application.Common.Exceptions;
 using ServiceDesk.Application.Common.Interfaces;
@@ -9,10 +8,9 @@ using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Identity;
 using ServiceDesk.Domain.Tickets;
-using ServiceDesk.Infrastructure.Persistence;
 using ValidationException = ServiceDesk.Application.Common.Exceptions.ValidationException;
 
-namespace ServiceDesk.Infrastructure.Services;
+namespace ServiceDesk.Application.Features.Tickets;
 
 public sealed class TicketService : ITicketService
 {
@@ -44,22 +42,22 @@ public sealed class TicketService : ITicketService
             .ToList()
     };
 
-    private readonly ServiceDeskDbContext _context;
+    private readonly IApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
-    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ICatalogVerificationService _catalogVerification;
     private readonly IValidator<CreateTicketRequest> _validator;
     private readonly IValidator<UpdateTicketRequest> _updateValidator;
 
     public TicketService(
-        ServiceDeskDbContext context,
+        IApplicationDbContext context,
         ICurrentUserService currentUser,
-        UserManager<ApplicationUser> userManager,
+        ICatalogVerificationService catalogVerification,
         IValidator<CreateTicketRequest> validator,
         IValidator<UpdateTicketRequest> updateValidator)
     {
         _context = context;
         _currentUser = currentUser;
-        _userManager = userManager;
+        _catalogVerification = catalogVerification;
         _validator = validator;
         _updateValidator = updateValidator;
     }
@@ -71,11 +69,7 @@ public sealed class TicketService : ITicketService
         Guid companyId = _currentUser.CompanyId;
         Guid userId = _currentUser.UserId;
 
-        await EnsureCatalogValidAsync(
-            _context.Categories,
-            "CategoryId",
-            category => category.Id == request.CategoryId && category.CompanyId == companyId && category.IsActive,
-            cancellationToken);
+        await _catalogVerification.EnsureCategoryBelongsToCompanyAsync(request.CategoryId, cancellationToken);
 
         Guid statusId = await FindInitialStatusIdAsync(companyId, cancellationToken);
         Guid priorityId = await FindDefaultPriorityIdAsync(companyId, cancellationToken);
@@ -144,7 +138,7 @@ public sealed class TicketService : ITicketService
             .AsNoTracking()
             .Where(user => user.IsActive
                 && user.CompanyId == _currentUser.CompanyId
-                && _context.UserRoles.Any(ur => ur.UserId == user.Id && ur.RoleId == _context.Roles
+                && _context.UserRoles.Any(userRole => userRole.UserId == user.Id && userRole.RoleId == _context.Roles
                     .Where(role => role.Name == Roles.Tecnico)
                     .Select(role => role.Id)
                     .FirstOrDefault()))
@@ -191,24 +185,8 @@ public sealed class TicketService : ITicketService
 
         await EnsureTechnicianValidAsync(request.AssignedToId, cancellationToken);
 
-        await EnsureCatalogValidAsync(
-            _context.Priorities,
-            "PriorityId",
-            priority => priority.Id == request.PriorityId && priority.CompanyId == ticket.CompanyId && priority.IsActive,
-            cancellationToken);
-
-        Status? status = await _context.Statuses
-            .AsNoTracking()
-            .Where(item => item.Id == request.StatusId && item.CompanyId == ticket.CompanyId && item.IsActive)
-            .SingleOrDefaultAsync(cancellationToken);
-
-        if (status is null)
-        {
-            throw new ValidationException(new Dictionary<string, string[]>
-            {
-                ["StatusId"] = ["El estado indicado no existe, no pertenece a tu empresa o está inactivo."]
-            });
-        }
+        await _catalogVerification.EnsurePriorityBelongsToCompanyAsync(request.PriorityId, cancellationToken);
+        Status status = await _catalogVerification.EnsureStatusBelongsToCompanyAsync(request.StatusId, cancellationToken);
 
         ticket.AssignedToId = request.AssignedToId;
         ticket.PriorityId = request.PriorityId;
@@ -222,7 +200,9 @@ public sealed class TicketService : ITicketService
 
     private async Task EnsureTechnicianValidAsync(Guid technicianId, CancellationToken cancellationToken)
     {
-        ApplicationUser? technician = await _userManager.FindByIdAsync(technicianId.ToString());
+        ApplicationUser? technician = await _context.Users
+            .AsNoTracking()
+            .SingleOrDefaultAsync(user => user.Id == technicianId, cancellationToken);
 
         if (technician is null || !technician.IsActive)
         {
@@ -240,7 +220,14 @@ public sealed class TicketService : ITicketService
             });
         }
 
-        if (!await _userManager.IsInRoleAsync(technician, Roles.Tecnico))
+        bool isTechnician = await _context.UserRoles
+            .Where(userRole => userRole.UserId == technicianId && userRole.RoleId == _context.Roles
+                .Where(role => role.Name == Roles.Tecnico)
+                .Select(role => role.Id)
+                .FirstOrDefault())
+            .AnyAsync(cancellationToken);
+
+        if (!isTechnician)
         {
             throw new ValidationException(new Dictionary<string, string[]>
             {
@@ -283,22 +270,5 @@ public sealed class TicketService : ITicketService
         }
 
         return priorityId.Value;
-    }
-
-    private static async Task EnsureCatalogValidAsync<TEntity>(
-        IQueryable<TEntity> entities,
-        string propertyName,
-        Expression<Func<TEntity, bool>> predicate,
-        CancellationToken cancellationToken)
-    {
-        bool exists = await entities.AnyAsync(predicate, cancellationToken);
-
-        if (!exists)
-        {
-            throw new ValidationException(new Dictionary<string, string[]>
-            {
-                [propertyName] = ["El catálogo indicado no existe, no pertenece a tu empresa o está inactivo."]
-            });
-        }
     }
 }

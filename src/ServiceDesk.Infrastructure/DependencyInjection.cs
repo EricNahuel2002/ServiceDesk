@@ -73,7 +73,7 @@ public static class DependencyInjection
 
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<ITicketService, TicketService>();
+        services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ServiceDeskDbContext>());
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<ServiceDeskDbInitializer>();
