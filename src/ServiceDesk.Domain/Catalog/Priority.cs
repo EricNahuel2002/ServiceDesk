@@ -4,7 +4,7 @@ using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Domain.Catalog;
 
-public class Priority : BaseEntity
+public class Priority : BaseEntity, ICatalogItem
 {
     public Guid CompanyId { get; set; }
 
