@@ -1,11 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using ServiceDesk.Application.Common.Interfaces;
+using ServiceDesk.Application.Configuration;
 using ServiceDesk.Domain.Identity;
-using ServiceDesk.Infrastructure.Configuration;
 
 namespace ServiceDesk.Infrastructure.Services;
 
@@ -13,9 +12,9 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
 {
     private readonly JwtSettings _settings;
 
-    public JwtTokenGenerator(IOptions<JwtSettings> settings)
+    public JwtTokenGenerator(JwtSettings settings)
     {
-        _settings = settings.Value;
+        _settings = settings;
     }
 
     public string GenerateAccessToken(ApplicationUser user, string role)

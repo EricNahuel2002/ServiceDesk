@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceDesk.Application.Common.Interfaces;
+using ServiceDesk.Application.Features.Auth;
 using ServiceDesk.Application.Features.Catalog;
 using ServiceDesk.Application.Features.Tickets;
 
@@ -15,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<ICatalogVerificationService, CatalogVerificationService>();
         services.AddScoped<ITicketService, TicketService>();
+        services.AddScoped<IAuthService, AuthService>();
 
         return services;
     }

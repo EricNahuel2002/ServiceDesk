@@ -1,4 +1,4 @@
-namespace ServiceDesk.Infrastructure.Configuration;
+namespace ServiceDesk.Application.Configuration;
 
 public sealed class JwtSettings
 {

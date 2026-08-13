@@ -1,10 +1,9 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using ServiceDesk.Application.Configuration;
 using ServiceDesk.Domain.Identity;
-using ServiceDesk.Infrastructure.Configuration;
 using ServiceDesk.Infrastructure.Services;
 
 namespace ServiceDesk.UnitTests;
@@ -24,7 +23,7 @@ public class JwtTokenGeneratorTests
             RefreshTokenExpirationDays = 7
         };
 
-        return new JwtTokenGenerator(Options.Create(settings));
+        return new JwtTokenGenerator(settings);
     }
 
     private static ApplicationUser CreateUser() =>

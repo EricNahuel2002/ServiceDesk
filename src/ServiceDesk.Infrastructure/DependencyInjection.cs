@@ -4,11 +4,10 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using ServiceDesk.Application.Common.Interfaces;
+using ServiceDesk.Application.Configuration;
 using ServiceDesk.Domain.Identity;
-using ServiceDesk.Infrastructure.Configuration;
 using ServiceDesk.Infrastructure.Persistence;
 using ServiceDesk.Infrastructure.Persistence.Repositories;
 using ServiceDesk.Infrastructure.Persistence.Seed;
@@ -43,7 +42,7 @@ public static class DependencyInjection
 
         JwtSettings jwtSettings = ReadJwtSettings(configuration);
 
-        services.AddSingleton<IOptions<JwtSettings>>(Options.Create(jwtSettings));
+        services.AddSingleton(jwtSettings);
 
         services
             .AddAuthentication(options =>
@@ -73,7 +72,7 @@ public static class DependencyInjection
             .AddPolicy(AuthPolicies.RequireCliente, policy => policy.RequireRole(Roles.Cliente));
 
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ServiceDeskDbContext>());
         services.AddScoped<ITicketRepository, TicketRepository>();
         services.AddScoped<ICatalogRepository, CatalogRepository>();

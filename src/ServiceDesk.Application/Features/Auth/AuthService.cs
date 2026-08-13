@@ -1,25 +1,22 @@
 using System.Security.Cryptography;
 using System.Text;
 using FluentValidation;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using ServiceDesk.Application.Common.Exceptions;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.Common.Validation;
+using ServiceDesk.Application.Configuration;
 using ServiceDesk.Application.DTOs.Auth;
 using ServiceDesk.Domain.Identity;
-using ServiceDesk.Infrastructure.Configuration;
-using ServiceDesk.Infrastructure.Persistence;
 using ValidationException = ServiceDesk.Application.Common.Exceptions.ValidationException;
 
-namespace ServiceDesk.Infrastructure.Services;
+namespace ServiceDesk.Application.Features.Auth;
 
 public sealed class AuthService : IAuthService
 {
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly RoleManager<ApplicationRole> _roleManager;
-    private readonly ServiceDeskDbContext _context;
+    private readonly IIdentityService _identityService;
+    private readonly IRefreshTokenRepository _refreshTokens;
+    private readonly ICompanyRepository _companies;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IJwtTokenGenerator _tokenGenerator;
     private readonly JwtSettings _settings;
     private readonly IValidator<RegisterRequest> _registerValidator;
@@ -29,22 +26,24 @@ public sealed class AuthService : IAuthService
     private readonly IValidator<AdminCreateUserRequest> _adminCreateUserValidator;
 
     public AuthService(
-        UserManager<ApplicationUser> userManager,
-        RoleManager<ApplicationRole> roleManager,
-        ServiceDeskDbContext context,
+        IIdentityService identityService,
+        IRefreshTokenRepository refreshTokens,
+        ICompanyRepository companies,
+        IUnitOfWork unitOfWork,
         IJwtTokenGenerator tokenGenerator,
-        IOptions<JwtSettings> settings,
+        JwtSettings settings,
         IValidator<RegisterRequest> registerValidator,
         IValidator<LoginRequest> loginValidator,
         IValidator<RefreshTokenRequest> refreshTokenValidator,
         IValidator<LogoutRequest> logoutValidator,
         IValidator<AdminCreateUserRequest> adminCreateUserValidator)
     {
-        _userManager = userManager;
-        _roleManager = roleManager;
-        _context = context;
+        _identityService = identityService;
+        _refreshTokens = refreshTokens;
+        _companies = companies;
+        _unitOfWork = unitOfWork;
         _tokenGenerator = tokenGenerator;
-        _settings = settings.Value;
+        _settings = settings;
         _registerValidator = registerValidator;
         _loginValidator = loginValidator;
         _refreshTokenValidator = refreshTokenValidator;
@@ -74,9 +73,9 @@ public sealed class AuthService : IAuthService
     {
         await ValidationHelper.ValidateAsync(_loginValidator, request, cancellationToken);
 
-        ApplicationUser? user = await _userManager.FindByEmailAsync(request.Email);
+        ApplicationUser? user = await _identityService.FindByEmailAsync(request.Email, cancellationToken);
 
-        if (user is null || !await _userManager.CheckPasswordAsync(user, request.Password))
+        if (user is null || !await _identityService.CheckPasswordAsync(user, request.Password))
         {
             throw new UnauthorizedException("Las credenciales son inválidas.");
         }
@@ -95,15 +94,14 @@ public sealed class AuthService : IAuthService
 
         string presentedTokenHash = HashToken(request.RefreshToken);
 
-        RefreshToken? stored = await _context.RefreshTokens
-            .SingleOrDefaultAsync(rt => rt.TokenHash == presentedTokenHash, cancellationToken);
+        RefreshToken? stored = await _refreshTokens.GetByTokenHashAsync(presentedTokenHash, cancellationToken);
 
         if (stored is null || !stored.IsActive)
         {
             throw new UnauthorizedException("El refresh token es inválido o ha expirado.");
         }
 
-        ApplicationUser? user = await _userManager.FindByIdAsync(stored.UserId.ToString());
+        ApplicationUser? user = await _identityService.FindByIdAsync(stored.UserId, cancellationToken);
 
         if (user is null || !user.IsActive)
         {
@@ -124,7 +122,7 @@ public sealed class AuthService : IAuthService
 
         await EnsureCompanyExistsAsync(request.CompanyId, cancellationToken);
 
-        if (await _roleManager.FindByNameAsync(request.Role) is null)
+        if (!await _identityService.RoleExistsAsync(request.Role, cancellationToken))
         {
             throw new NotFoundException($"El rol {request.Role} no existe.");
         }
@@ -147,13 +145,12 @@ public sealed class AuthService : IAuthService
 
         string tokenHash = HashToken(request.RefreshToken);
 
-        RefreshToken? stored = await _context.RefreshTokens
-            .SingleOrDefaultAsync(rt => rt.TokenHash == tokenHash, cancellationToken);
+        RefreshToken? stored = await _refreshTokens.GetByTokenHashAsync(tokenHash, cancellationToken);
 
         if (stored is not null)
         {
             stored.RevokedAtUtc = DateTime.UtcNow;
-            await _context.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
     }
 
@@ -170,9 +167,10 @@ public sealed class AuthService : IAuthService
         RefreshToken refreshToken,
         CancellationToken cancellationToken)
     {
-        string role = (await _userManager.GetRolesAsync(user)).SingleOrDefault() ?? Roles.Cliente;
+        IReadOnlyList<string> roles = await _identityService.GetRolesAsync(user, cancellationToken);
+        string role = roles.SingleOrDefault() ?? Roles.Cliente;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new AuthResponse
         {
@@ -205,7 +203,7 @@ public sealed class AuthService : IAuthService
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_settings.RefreshTokenExpirationDays)
         };
 
-        _context.RefreshTokens.Add(entity);
+        _refreshTokens.Add(entity);
 
         return (rawToken, entity);
     }
@@ -219,7 +217,7 @@ public sealed class AuthService : IAuthService
         string role,
         CancellationToken cancellationToken)
     {
-        if (await _userManager.FindByEmailAsync(email) is not null)
+        if (await _identityService.FindByEmailAsync(email, cancellationToken) is not null)
         {
             throw new ValidationException(new Dictionary<string, string[]>
             {
@@ -238,18 +236,18 @@ public sealed class AuthService : IAuthService
             IsActive = true
         };
 
-        IdentityResult createResult = await _userManager.CreateAsync(user, password);
+        IdentityOperationResult createResult = await _identityService.CreateAsync(user, password);
 
         if (!createResult.Succeeded)
         {
-            throw new ValidationException(ToErrorDictionary(createResult));
+            throw new ValidationException(createResult.Errors);
         }
 
-        IdentityResult roleResult = await _userManager.AddToRoleAsync(user, role);
+        IdentityOperationResult roleResult = await _identityService.AddToRoleAsync(user, role);
 
         if (!roleResult.Succeeded)
         {
-            throw new ValidationException(ToErrorDictionary(roleResult));
+            throw new ValidationException(roleResult.Errors);
         }
 
         return user;
@@ -257,18 +255,11 @@ public sealed class AuthService : IAuthService
 
     private async Task EnsureCompanyExistsAsync(Guid companyId, CancellationToken cancellationToken)
     {
-        bool exists = await _context.Companies.AnyAsync(c => c.Id == companyId, cancellationToken);
-
-        if (!exists)
+        if (!await _companies.ExistsAsync(companyId, cancellationToken))
         {
             throw new NotFoundException($"La empresa con id {companyId} no existe.");
         }
     }
-
-    private static IReadOnlyDictionary<string, string[]> ToErrorDictionary(IdentityResult result) =>
-        result.Errors
-            .GroupBy(e => e.Code)
-            .ToDictionary(group => group.Key, group => group.Select(e => e.Description).ToArray());
 
     private static string GenerateTokenValue() =>
         Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
