@@ -10,6 +10,7 @@ using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Domain.Identity;
 using ServiceDesk.Infrastructure.Configuration;
 using ServiceDesk.Infrastructure.Persistence;
+using ServiceDesk.Infrastructure.Persistence.Repositories;
 using ServiceDesk.Infrastructure.Persistence.Seed;
 using ServiceDesk.Infrastructure.Services;
 
@@ -73,7 +74,12 @@ public static class DependencyInjection
 
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ServiceDeskDbContext>());
+        services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ServiceDeskDbContext>());
+        services.AddScoped<ITicketRepository, TicketRepository>();
+        services.AddScoped<ICatalogRepository, CatalogRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<ICompanyRepository, CompanyRepository>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<ServiceDeskDbInitializer>();

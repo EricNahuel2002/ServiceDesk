@@ -12,7 +12,7 @@ using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Infrastructure.Persistence;
 
-public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>, IApplicationDbContext
+public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>, IUnitOfWork
 {
     public ServiceDeskDbContext(DbContextOptions<ServiceDeskDbContext> options)
         : base(options)

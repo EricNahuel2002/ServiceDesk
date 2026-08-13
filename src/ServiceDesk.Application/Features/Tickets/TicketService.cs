@@ -1,6 +1,4 @@
-using System.Linq.Expressions;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 using ServiceDesk.Application.Common.Exceptions;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.Common.Validation;
@@ -14,48 +12,32 @@ namespace ServiceDesk.Application.Features.Tickets;
 
 public sealed class TicketService : ITicketService
 {
-    private static readonly Expression<Func<Ticket, TicketDto>> TicketProjection = ticket => new TicketDto
-    {
-        Id = ticket.Id,
-        Title = ticket.Title,
-        Description = ticket.Description,
-        CompanyId = ticket.CompanyId,
-        CategoryId = ticket.CategoryId,
-        CategoryName = ticket.Category!.Name,
-        PriorityId = ticket.PriorityId,
-        PriorityName = ticket.Priority!.Name,
-        StatusId = ticket.StatusId,
-        StatusName = ticket.Status!.Name,
-        CreatedById = ticket.CreatedById,
-        AssignedToId = ticket.AssignedToId,
-        CreatedAtUtc = ticket.CreatedAtUtc,
-        UpdatedAtUtc = ticket.UpdatedAtUtc,
-        Attachments = ticket.Attachments
-            .Select(attachment => new TicketAttachmentDto
-            {
-                Id = attachment.Id,
-                FileName = attachment.FileName,
-                ContentType = attachment.ContentType,
-                SizeInBytes = attachment.SizeInBytes,
-                BlobUrl = attachment.BlobUrl
-            })
-            .ToList()
-    };
-
-    private readonly IApplicationDbContext _context;
+    private readonly ITicketRepository _tickets;
+    private readonly ICatalogRepository _catalog;
+    private readonly IUserRepository _users;
+    private readonly IIdentityService _identity;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
     private readonly ICatalogVerificationService _catalogVerification;
     private readonly IValidator<CreateTicketRequest> _validator;
     private readonly IValidator<UpdateTicketRequest> _updateValidator;
 
     public TicketService(
-        IApplicationDbContext context,
+        ITicketRepository tickets,
+        ICatalogRepository catalog,
+        IUserRepository users,
+        IIdentityService identity,
+        IUnitOfWork unitOfWork,
         ICurrentUserService currentUser,
         ICatalogVerificationService catalogVerification,
         IValidator<CreateTicketRequest> validator,
         IValidator<UpdateTicketRequest> updateValidator)
     {
-        _context = context;
+        _tickets = tickets;
+        _catalog = catalog;
+        _users = users;
+        _identity = identity;
+        _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _catalogVerification = catalogVerification;
         _validator = validator;
@@ -101,68 +83,25 @@ public sealed class TicketService : ITicketService
             });
         }
 
-        _context.Tickets.Add(ticket);
+        _tickets.Add(ticket);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<TicketDto>> GetMineAsync(CancellationToken cancellationToken)
-    {
-        List<TicketDto> tickets = await _context.Tickets
-            .AsNoTracking()
-            .Where(ticket => ticket.CreatedById == _currentUser.UserId)
-            .OrderByDescending(ticket => ticket.CreatedAtUtc)
-            .Select(TicketProjection)
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<TicketDto>> GetMineAsync(CancellationToken cancellationToken) =>
+        await _tickets.GetMineAsync(_currentUser.UserId, cancellationToken);
 
-        return tickets;
-    }
+    public async Task<IReadOnlyList<TicketDto>> GetAllAsync(CancellationToken cancellationToken) =>
+        await _tickets.GetAllAsync(_currentUser.CompanyId, cancellationToken);
 
-    public async Task<IReadOnlyList<TicketDto>> GetAllAsync(CancellationToken cancellationToken)
-    {
-        List<TicketDto> tickets = await _context.Tickets
-            .AsNoTracking()
-            .Where(ticket => ticket.CompanyId == _currentUser.CompanyId)
-            .OrderByDescending(ticket => ticket.CreatedAtUtc)
-            .Select(TicketProjection)
-            .ToListAsync(cancellationToken);
-
-        return tickets;
-    }
-
-    public async Task<IReadOnlyList<TechnicianDto>> GetTechniciansAsync(CancellationToken cancellationToken)
-    {
-        List<TechnicianDto> technicians = await _context.Users
-            .AsNoTracking()
-            .Where(user => user.IsActive
-                && user.CompanyId == _currentUser.CompanyId
-                && _context.UserRoles.Any(userRole => userRole.UserId == user.Id && userRole.RoleId == _context.Roles
-                    .Where(role => role.Name == Roles.Tecnico)
-                    .Select(role => role.Id)
-                    .FirstOrDefault()))
-            .OrderBy(user => user.FirstName)
-            .ThenBy(user => user.LastName)
-            .Select(user => new TechnicianDto
-            {
-                Id = user.Id,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Email = user.Email ?? string.Empty
-            })
-            .ToListAsync(cancellationToken);
-
-        return technicians;
-    }
+    public async Task<IReadOnlyList<TechnicianDto>> GetTechniciansAsync(CancellationToken cancellationToken) =>
+        await _users.GetTechniciansAsync(_currentUser.CompanyId, cancellationToken);
 
     public async Task<TicketDto> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
-        TicketDto? ticket = await _context.Tickets
-            .AsNoTracking()
-            .Where(ticket => ticket.Id == id && ticket.CompanyId == _currentUser.CompanyId)
-            .Select(TicketProjection)
-            .SingleOrDefaultAsync(cancellationToken);
+        TicketDto? ticket = await _tickets.GetDtoByIdAsync(id, _currentUser.CompanyId, cancellationToken);
 
         return ticket ?? throw new NotFoundException($"El ticket con id {id} no existe.");
     }
@@ -174,9 +113,7 @@ public sealed class TicketService : ITicketService
     {
         await ValidationHelper.ValidateAsync(_updateValidator, request, cancellationToken);
 
-        Ticket? ticket = await _context.Tickets
-            .Where(ticket => ticket.Id == id && ticket.CompanyId == _currentUser.CompanyId)
-            .SingleOrDefaultAsync(cancellationToken);
+        Ticket? ticket = await _tickets.GetByIdAsync(id, _currentUser.CompanyId, cancellationToken);
 
         if (ticket is null)
         {
@@ -193,16 +130,14 @@ public sealed class TicketService : ITicketService
         ticket.StatusId = request.StatusId;
         ticket.ResolvedAtUtc = status.IsClosed ? DateTime.UtcNow : null;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
     private async Task EnsureTechnicianValidAsync(Guid technicianId, CancellationToken cancellationToken)
     {
-        ApplicationUser? technician = await _context.Users
-            .AsNoTracking()
-            .SingleOrDefaultAsync(user => user.Id == technicianId, cancellationToken);
+        ApplicationUser? technician = await _users.GetByIdAsync(technicianId, cancellationToken);
 
         if (technician is null || !technician.IsActive)
         {
@@ -220,14 +155,7 @@ public sealed class TicketService : ITicketService
             });
         }
 
-        bool isTechnician = await _context.UserRoles
-            .Where(userRole => userRole.UserId == technicianId && userRole.RoleId == _context.Roles
-                .Where(role => role.Name == Roles.Tecnico)
-                .Select(role => role.Id)
-                .FirstOrDefault())
-            .AnyAsync(cancellationToken);
-
-        if (!isTechnician)
+        if (!await _identity.IsInRoleAsync(technician, Roles.Tecnico, cancellationToken))
         {
             throw new ValidationException(new Dictionary<string, string[]>
             {
@@ -238,10 +166,7 @@ public sealed class TicketService : ITicketService
 
     private async Task<Guid> FindInitialStatusIdAsync(Guid companyId, CancellationToken cancellationToken)
     {
-        Guid? statusId = await _context.Statuses
-            .Where(status => status.CompanyId == companyId && status.Name == "Nuevo" && status.IsActive)
-            .Select(status => (Guid?)status.Id)
-            .SingleOrDefaultAsync(cancellationToken);
+        Guid? statusId = await _catalog.FindInitialStatusIdAsync(companyId, cancellationToken);
 
         if (statusId is null)
         {
@@ -256,10 +181,7 @@ public sealed class TicketService : ITicketService
 
     private async Task<Guid> FindDefaultPriorityIdAsync(Guid companyId, CancellationToken cancellationToken)
     {
-        Guid? priorityId = await _context.Priorities
-            .Where(priority => priority.CompanyId == companyId && priority.Name == "Media" && priority.IsActive)
-            .Select(priority => (Guid?)priority.Id)
-            .SingleOrDefaultAsync(cancellationToken);
+        Guid? priorityId = await _catalog.FindDefaultPriorityIdAsync(companyId, cancellationToken);
 
         if (priorityId is null)
         {

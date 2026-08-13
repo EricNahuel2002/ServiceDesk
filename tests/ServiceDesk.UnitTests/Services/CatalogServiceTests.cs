@@ -4,6 +4,7 @@ using ServiceDesk.Application.DTOs.Catalog;
 using ServiceDesk.Application.Features.Catalog;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Infrastructure.Persistence;
+using ServiceDesk.Infrastructure.Persistence.Repositories;
 using ServiceDesk.UnitTests.Fakes;
 
 namespace ServiceDesk.UnitTests.Services;
@@ -195,7 +196,7 @@ public sealed class CatalogServiceTests
     }
 
     private static CatalogService CreateService(ServiceDeskDbContext context) =>
-        new(context, new FakeCurrentUserService(Guid.NewGuid(), CompanyId));
+        new(new CatalogRepository(context), new FakeCurrentUserService(Guid.NewGuid(), CompanyId));
 
     private static Category CreateCategory(Guid companyId, string name, bool isActive = true) =>
         new() { Id = Guid.NewGuid(), CompanyId = companyId, Name = name, IsActive = isActive };

@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using ServiceDesk.Application.Common.Exceptions;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Domain.Catalog;
@@ -7,12 +6,12 @@ namespace ServiceDesk.Application.Features.Catalog;
 
 public sealed class CatalogVerificationService : ICatalogVerificationService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly ICatalogRepository _catalog;
     private readonly ICurrentUserService _currentUser;
 
-    public CatalogVerificationService(IApplicationDbContext context, ICurrentUserService currentUser)
+    public CatalogVerificationService(ICatalogRepository catalog, ICurrentUserService currentUser)
     {
-        _context = context;
+        _catalog = catalog;
         _currentUser = currentUser;
     }
 
@@ -20,9 +19,7 @@ public sealed class CatalogVerificationService : ICatalogVerificationService
         Guid categoryId,
         CancellationToken cancellationToken)
     {
-        Category? category = await _context.Categories
-            .AsNoTracking()
-            .SingleOrDefaultAsync(item => item.Id == categoryId, cancellationToken);
+        Category? category = await _catalog.GetCategoryByIdAsync(categoryId, cancellationToken);
 
         if (!IsAvailableForCompany(category, _currentUser.CompanyId))
         {
@@ -34,9 +31,7 @@ public sealed class CatalogVerificationService : ICatalogVerificationService
         Guid priorityId,
         CancellationToken cancellationToken)
     {
-        Priority? priority = await _context.Priorities
-            .AsNoTracking()
-            .SingleOrDefaultAsync(item => item.Id == priorityId, cancellationToken);
+        Priority? priority = await _catalog.GetPriorityByIdAsync(priorityId, cancellationToken);
 
         if (!IsAvailableForCompany(priority, _currentUser.CompanyId))
         {
@@ -48,9 +43,7 @@ public sealed class CatalogVerificationService : ICatalogVerificationService
         Guid statusId,
         CancellationToken cancellationToken)
     {
-        Status? status = await _context.Statuses
-            .AsNoTracking()
-            .SingleOrDefaultAsync(item => item.Id == statusId, cancellationToken);
+        Status? status = await _catalog.GetStatusByIdAsync(statusId, cancellationToken);
 
         if (!IsAvailableForCompany(status, _currentUser.CompanyId))
         {
