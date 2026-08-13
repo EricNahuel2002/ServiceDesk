@@ -83,7 +83,28 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<ServiceDeskDbInitializer>();
 
+        EmailSettings emailSettings = ReadEmailSettings(configuration);
+        services.Configure<EmailSettings>(configuration.GetSection(EmailSettingsSection));
+        services.AddScoped<IEmailService, EmailService>();
+
         return services;
+    }
+
+    private const string EmailSettingsSection = "Email";
+
+    private static EmailSettings ReadEmailSettings(IConfiguration configuration)
+    {
+        EmailSettings settings = configuration.GetSection(EmailSettingsSection).Get<EmailSettings>() ?? new EmailSettings();
+
+        if (settings.Enabled
+            && (string.IsNullOrWhiteSpace(settings.Host)
+                || string.IsNullOrWhiteSpace(settings.FromEmail)))
+        {
+            throw new InvalidOperationException(
+                "La sección Email está habilitada pero faltan valores obligatorios (Host, FromEmail).");
+        }
+
+        return settings;
     }
 
     private static JwtSettings ReadJwtSettings(IConfiguration configuration)

@@ -14,6 +14,13 @@ public interface ITicketService
 
     Task<IReadOnlyList<TechnicianDto>> GetTechniciansAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<TicketDto>> GetAssignedToMeAsync(CancellationToken cancellationToken = default);
+
+    Task<TicketDto> ResolveAsync(
+        Guid id,
+        ResolveTicketRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<TicketDto> UpdateAsync(
         Guid id,
         UpdateTicketRequest request,

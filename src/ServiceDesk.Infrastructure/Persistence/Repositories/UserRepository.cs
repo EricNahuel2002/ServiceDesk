@@ -17,6 +17,7 @@ public sealed class UserRepository : IUserRepository
     public async Task<ApplicationUser?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await _context.Users
             .AsNoTracking()
+            .Include(user => user.Roles)
             .SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<TechnicianDto>> GetTechniciansAsync(

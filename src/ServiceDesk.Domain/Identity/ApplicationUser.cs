@@ -30,4 +30,9 @@ public class ApplicationUser : IdentityUser<Guid>
     public ICollection<TicketAttachment> UploadedAttachments { get; set; } = [];
 
     public ICollection<AuditLog> AuditLogs { get; set; } = [];
+
+    public ICollection<ApplicationRole> Roles { get; set; } = [];
+
+    public bool IsInRole(string role) =>
+        Roles.Any(item => string.Equals(item.Name, role, StringComparison.OrdinalIgnoreCase));
 }

@@ -160,6 +160,15 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             .SingleAsync();
     }
 
+    public async Task<int> CountTicketCommentsAsync(Guid ticketId)
+    {
+        using IServiceScope scope = Services.CreateScope();
+        ServiceDeskDbContext context = scope.ServiceProvider.GetRequiredService<ServiceDeskDbContext>();
+        return await context.TicketComments
+            .Where(c => c.TicketId == ticketId)
+            .CountAsync();
+    }
+
     public async Task ResetTicketsAsync()
     {
         using IServiceScope scope = Services.CreateScope();

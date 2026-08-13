@@ -12,4 +12,6 @@ public class ApplicationRole : IdentityRole<Guid>
         : base(roleName)
     {
     }
+
+    public ICollection<ApplicationUser> Users { get; set; } = [];
 }

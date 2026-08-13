@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using ServiceDesk.Application.Common.Exceptions;
+using ServiceDesk.Domain.Common;
 
 namespace ServiceDesk.Api.Middleware;
 
@@ -49,7 +50,10 @@ public class ExceptionHandlingMiddleware
 
     private void LogException(HttpContext context, Exception exception)
     {
-        if (exception is ValidationException or UnauthorizedException or NotFoundException)
+        if (exception is ValidationException
+            or UnauthorizedException
+            or NotFoundException
+            or DomainRuleViolationException)
         {
             _logger.LogWarning(
                 exception,
@@ -82,6 +86,11 @@ public class ExceptionHandlingMiddleware
                 StatusCodes.Status404NotFound,
                 "No encontrado.",
                 notFound.Message),
+            DomainRuleViolationException domainRule => CreateProblem(
+                context,
+                StatusCodes.Status400BadRequest,
+                "Regla de negocio violada.",
+                domainRule.Message),
             _ => CreateProblem(
                 context,
                 StatusCodes.Status500InternalServerError,

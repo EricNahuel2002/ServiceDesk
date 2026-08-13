@@ -51,6 +51,16 @@ public sealed class TicketRepository : ITicketRepository
             .Select(TicketProjection)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<TicketDto>> GetAssignedToAsync(
+        Guid assignedToId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Tickets
+            .AsNoTracking()
+            .Where(ticket => ticket.AssignedToId == assignedToId)
+            .OrderByDescending(ticket => ticket.CreatedAtUtc)
+            .Select(TicketProjection)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<TicketDto>> GetAllAsync(Guid companyId, CancellationToken cancellationToken = default) =>
         await _context.Tickets
             .AsNoTracking()
@@ -71,5 +81,18 @@ public sealed class TicketRepository : ITicketRepository
             .Where(ticket => ticket.Id == id && ticket.CompanyId == companyId)
             .SingleOrDefaultAsync(cancellationToken);
 
+    public async Task<Ticket?> GetAssignedTicketByIdAsync(
+        Guid id,
+        Guid companyId,
+        Guid assignedToId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Tickets
+            .Where(ticket => ticket.Id == id
+                && ticket.CompanyId == companyId
+                && ticket.AssignedToId == assignedToId)
+            .SingleOrDefaultAsync(cancellationToken);
+
     public void Add(Ticket ticket) => _context.Tickets.Add(ticket);
+
+    public void AddComment(TicketComment comment) => _context.TicketComments.Add(comment);
 }

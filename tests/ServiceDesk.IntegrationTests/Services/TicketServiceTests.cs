@@ -107,6 +107,84 @@ public sealed class TicketServiceTests
     }
 
     [Fact]
+    public async Task GetAssignedToMeAsync_ReturnsOnlyTicketsAssignedToCurrentUser()
+    {
+        await _factory.ResetTicketsAsync();
+        (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
+        Guid assignedTicketId = await CreateTicketAsync(companyId, "Asignado", assignedToId: technicianId);
+        await CreateTicketAsync(companyId, "Sin asignar");
+
+        await _factory.RunAsAsync(technicianId, companyId, Roles.Tecnico, async scope =>
+        {
+            ITicketService service = scope.ServiceProvider.GetRequiredService<ITicketService>();
+
+            IReadOnlyList<TicketDto> tickets = await service.GetAssignedToMeAsync();
+
+            TicketDto assigned = Assert.Single(tickets);
+            Assert.Equal(assignedTicketId, assigned.Id);
+        });
+    }
+
+    [Fact]
+    public async Task ResolveAsync_FinalizesTicket_WithResolutionComment()
+    {
+        await _factory.ResetTicketsAsync();
+        (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
+        Guid ticketId = await CreateTicketAsync(companyId, "Para resolver", assignedToId: technicianId);
+
+        await _factory.RunAsAsync(technicianId, companyId, Roles.Tecnico, async scope =>
+        {
+            ITicketService service = scope.ServiceProvider.GetRequiredService<ITicketService>();
+
+            TicketDto resolved = await service.ResolveAsync(
+                ticketId,
+                new ResolveTicketRequest { ResolutionNote = "Resuelto por el técnico." });
+
+            Assert.Equal("Resuelto", resolved.StatusName);
+        });
+
+        Assert.NotNull(await _factory.GetResolvedAtUtcAsync(ticketId));
+        Assert.Equal(1, await _factory.CountTicketCommentsAsync(ticketId));
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ThrowsNotFound_WhenTicketIsNotAssignedToCurrentUser()
+    {
+        await _factory.ResetTicketsAsync();
+        (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
+        Guid ticketId = await CreateTicketAsync(companyId, "No asignado");
+
+        await _factory.RunAsAsync(technicianId, companyId, Roles.Tecnico, async scope =>
+        {
+            ITicketService service = scope.ServiceProvider.GetRequiredService<ITicketService>();
+
+            await Assert.ThrowsAsync<NotFoundException>(() =>
+                service.ResolveAsync(ticketId, new ResolveTicketRequest()));
+        });
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ThrowsValidation_WhenTicketIsAlreadyResolved()
+    {
+        await _factory.ResetTicketsAsync();
+        (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
+        Guid resueltoId = await _factory.GetStatusIdAsync(companyId, "Resuelto");
+        Guid ticketId = await CreateTicketAsync(
+            companyId,
+            "Ya resuelto",
+            statusId: resueltoId,
+            assignedToId: technicianId);
+
+        await _factory.RunAsAsync(technicianId, companyId, Roles.Tecnico, async scope =>
+        {
+            ITicketService service = scope.ServiceProvider.GetRequiredService<ITicketService>();
+
+            await Assert.ThrowsAsync<ValidationException>(() =>
+                service.ResolveAsync(ticketId, new ResolveTicketRequest()));
+        });
+    }
+
+    [Fact]
     public async Task UpdateAsync_AppliesChanges()
     {
         await _factory.ResetTicketsAsync();
@@ -344,18 +422,24 @@ public sealed class TicketServiceTests
         return (categoryId, priorityId, statusId);
     }
 
-    private async Task<Guid> CreateTicketAsync(Guid companyId, string title, DateTime? createdAtUtc = null)
+    private async Task<Guid> CreateTicketAsync(
+        Guid companyId,
+        string title,
+        Guid? assignedToId = null,
+        Guid? statusId = null,
+        DateTime? createdAtUtc = null)
     {
         (_, Guid adminId, _, _) = await GetSeedAsync();
-        (Guid categoryId, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+        (Guid categoryId, Guid priorityId, Guid defaultStatusId) = await GetCatalogAsync(companyId);
         return await _factory.CreateTicketAsync(
             companyId,
             categoryId,
             priorityId,
-            statusId,
+            statusId ?? defaultStatusId,
             adminId,
             title,
             $"Descripción de {title}",
+            assignedToId: assignedToId,
             createdAtUtc: createdAtUtc);
     }
 

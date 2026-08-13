@@ -90,6 +90,13 @@ public sealed class CatalogRepository : ICatalogRepository
             .Select(status => (Guid?)status.Id)
             .SingleOrDefaultAsync(cancellationToken);
 
+    public async Task<Guid?> FindFirstClosedStatusIdAsync(Guid companyId, CancellationToken cancellationToken = default) =>
+        await _context.Statuses
+            .Where(status => status.CompanyId == companyId && status.IsActive && status.IsClosed)
+            .OrderBy(status => status.SortOrder)
+            .Select(status => (Guid?)status.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<Guid?> FindDefaultPriorityIdAsync(Guid companyId, CancellationToken cancellationToken = default) =>
         await _context.Priorities
             .Where(priority => priority.CompanyId == companyId && priority.Name == "Media" && priority.IsActive)

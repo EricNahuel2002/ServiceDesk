@@ -4,6 +4,7 @@ using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.Common.Validation;
 using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Domain.Catalog;
+using ServiceDesk.Domain.Common;
 using ServiceDesk.Domain.Identity;
 using ServiceDesk.Domain.Tickets;
 using ValidationException = ServiceDesk.Application.Common.Exceptions.ValidationException;
@@ -21,6 +22,8 @@ public sealed class TicketService : ITicketService
     private readonly ICatalogVerificationService _catalogVerification;
     private readonly IValidator<CreateTicketRequest> _validator;
     private readonly IValidator<UpdateTicketRequest> _updateValidator;
+    private readonly IValidator<ResolveTicketRequest> _resolveValidator;
+    private readonly IEmailService _email;
 
     public TicketService(
         ITicketRepository tickets,
@@ -31,7 +34,9 @@ public sealed class TicketService : ITicketService
         ICurrentUserService currentUser,
         ICatalogVerificationService catalogVerification,
         IValidator<CreateTicketRequest> validator,
-        IValidator<UpdateTicketRequest> updateValidator)
+        IValidator<UpdateTicketRequest> updateValidator,
+        IValidator<ResolveTicketRequest> resolveValidator,
+        IEmailService email)
     {
         _tickets = tickets;
         _catalog = catalog;
@@ -42,6 +47,8 @@ public sealed class TicketService : ITicketService
         _catalogVerification = catalogVerification;
         _validator = validator;
         _updateValidator = updateValidator;
+        _resolveValidator = resolveValidator;
+        _email = email;
     }
 
     public async Task<TicketDto> CreateAsync(CreateTicketRequest request, CancellationToken cancellationToken)
@@ -93,6 +100,9 @@ public sealed class TicketService : ITicketService
     public async Task<IReadOnlyList<TicketDto>> GetMineAsync(CancellationToken cancellationToken) =>
         await _tickets.GetMineAsync(_currentUser.UserId, cancellationToken);
 
+    public async Task<IReadOnlyList<TicketDto>> GetAssignedToMeAsync(CancellationToken cancellationToken) =>
+        await _tickets.GetAssignedToAsync(_currentUser.UserId, cancellationToken);
+
     public async Task<IReadOnlyList<TicketDto>> GetAllAsync(CancellationToken cancellationToken) =>
         await _tickets.GetAllAsync(_currentUser.CompanyId, cancellationToken);
 
@@ -104,6 +114,73 @@ public sealed class TicketService : ITicketService
         TicketDto? ticket = await _tickets.GetDtoByIdAsync(id, _currentUser.CompanyId, cancellationToken);
 
         return ticket ?? throw new NotFoundException($"El ticket con id {id} no existe.");
+    }
+
+    public async Task<TicketDto> ResolveAsync(
+        Guid id,
+        ResolveTicketRequest request,
+        CancellationToken cancellationToken)
+    {
+        await ValidationHelper.ValidateAsync(_resolveValidator, request, cancellationToken);
+
+        Ticket? ticket = await _tickets.GetAssignedTicketByIdAsync(
+            id,
+            _currentUser.CompanyId,
+            _currentUser.UserId,
+            cancellationToken);
+
+        if (ticket is null)
+        {
+            throw new NotFoundException($"El ticket con id {id} no existe.");
+        }
+
+        ApplicationUser? technician = await _users.GetByIdAsync(_currentUser.UserId, cancellationToken);
+
+        if (technician is null)
+        {
+            throw new NotFoundException("El técnico actual no existe.");
+        }
+
+        TicketFinalizationPolicy.EnsureCanBeFinalizedBy(ticket, technician);
+
+        Status? currentStatus = await _catalog.GetStatusByIdAsync(ticket.StatusId, cancellationToken);
+
+        if (currentStatus is not null && currentStatus.IsClosed)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Ticket"] = ["El ticket ya fue finalizado."]
+            });
+        }
+
+        Guid? closedStatusId = await _catalog.FindFirstClosedStatusIdAsync(_currentUser.CompanyId, cancellationToken);
+
+        if (closedStatusId is null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["StatusId"] = ["No se encontró un estado de cierre para tu empresa."]
+            });
+        }
+
+        ticket.StatusId = closedStatusId.Value;
+        ticket.ResolvedAtUtc = DateTime.UtcNow;
+
+        if (!string.IsNullOrWhiteSpace(request.ResolutionNote))
+        {
+            _tickets.AddComment(new TicketComment
+            {
+                Id = Guid.NewGuid(),
+                TicketId = ticket.Id,
+                AuthorId = technician.Id,
+                Body = request.ResolutionNote.Trim(),
+                IsInternal = false
+            });
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
     public async Task<TicketDto> UpdateAsync(
@@ -120,7 +197,9 @@ public sealed class TicketService : ITicketService
             throw new NotFoundException($"El ticket con id {id} no existe.");
         }
 
-        await EnsureTechnicianValidAsync(request.AssignedToId, cancellationToken);
+        ApplicationUser technician = await EnsureTechnicianValidAsync(request.AssignedToId, cancellationToken);
+
+        bool wasReassigned = ticket.AssignedToId != request.AssignedToId;
 
         await _catalogVerification.EnsurePriorityBelongsToCompanyAsync(request.PriorityId, cancellationToken);
         Status status = await _catalogVerification.EnsureStatusBelongsToCompanyAsync(request.StatusId, cancellationToken);
@@ -132,10 +211,15 @@ public sealed class TicketService : ITicketService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        if (wasReassigned)
+        {
+            await SendAssignedNotificationAsync(ticket, technician, cancellationToken);
+        }
+
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
-    private async Task EnsureTechnicianValidAsync(Guid technicianId, CancellationToken cancellationToken)
+    private async Task<ApplicationUser> EnsureTechnicianValidAsync(Guid technicianId, CancellationToken cancellationToken)
     {
         ApplicationUser? technician = await _users.GetByIdAsync(technicianId, cancellationToken);
 
@@ -162,6 +246,37 @@ public sealed class TicketService : ITicketService
                 ["AssignedToId"] = ["El usuario indicado no tiene el rol de técnico."]
             });
         }
+
+        return technician;
+    }
+
+    private async Task SendAssignedNotificationAsync(
+        Ticket ticket,
+        ApplicationUser technician,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(technician.Email))
+        {
+            return;
+        }
+
+        Priority? priority = await _catalog.GetPriorityByIdAsync(ticket.PriorityId, cancellationToken);
+
+        string subject = "Se te asignó un ticket";
+        string body = $"""
+            Hola {technician.FirstName},
+
+            Se te asignó el siguiente ticket:
+
+            Título: {ticket.Title}
+            Descripción: {ticket.Description}
+            Prioridad: {priority?.Name ?? "No especificada"}
+
+            Saludos,
+            ServiceDesk
+            """;
+
+        await _email.SendAsync(technician.Email, subject, body, cancellationToken);
     }
 
     private async Task<Guid> FindInitialStatusIdAsync(Guid companyId, CancellationToken cancellationToken)

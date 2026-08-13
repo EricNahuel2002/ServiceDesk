@@ -19,5 +19,7 @@ public interface ICatalogRepository
 
     Task<Guid?> FindInitialStatusIdAsync(Guid companyId, CancellationToken cancellationToken = default);
 
+    Task<Guid?> FindFirstClosedStatusIdAsync(Guid companyId, CancellationToken cancellationToken = default);
+
     Task<Guid?> FindDefaultPriorityIdAsync(Guid companyId, CancellationToken cancellationToken = default);
 }
