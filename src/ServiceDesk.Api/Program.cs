@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using ServiceDesk.Api.Middleware;
@@ -7,6 +8,12 @@ using ServiceDesk.Infrastructure;
 using ServiceDesk.Infrastructure.Persistence.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
+
+string? keyVaultUri = builder.Configuration["KeyVault:VaultUri"];
+if (!string.IsNullOrWhiteSpace(keyVaultUri))
+{
+    builder.Configuration.AddAzureKeyVault(new Uri(keyVaultUri), new DefaultAzureCredential());
+}
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);

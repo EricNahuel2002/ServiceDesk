@@ -41,6 +41,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:DefaultConnection", TestConnectionString);
+        builder.UseSetting("KeyVault:VaultUri", string.Empty);
         builder.UseSetting("Jwt:Issuer", "ServiceDesk.Tests");
         builder.UseSetting("Jwt:Audience", "ServiceDesk.Tests.Clients");
         builder.UseSetting("Jwt:SecretKey", "TestSecretKey_AtLeast32Characters_LongEnough_123456");
