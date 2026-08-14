@@ -87,10 +87,15 @@ public static class DependencyInjection
         services.Configure<EmailSettings>(configuration.GetSection(EmailSettingsSection));
         services.AddScoped<IEmailService, EmailService>();
 
+        services.Configure<BlobStorageSettings>(configuration.GetSection(BlobStorageSettingsSection));
+        services.AddScoped<IBlobStorageService, BlobStorageService>();
+
         return services;
     }
 
     private const string EmailSettingsSection = "Email";
+
+    private const string BlobStorageSettingsSection = "BlobStorage";
 
     private static EmailSettings ReadEmailSettings(IConfiguration configuration)
     {

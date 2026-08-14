@@ -8,5 +8,5 @@ public sealed record TicketFileUpload
 
     public long SizeInBytes { get; init; }
 
-    public byte[] Content { get; init; } = [];
+    public Stream Content { get; init; } = Stream.Null;
 }

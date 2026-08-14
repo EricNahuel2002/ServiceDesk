@@ -135,6 +135,6 @@ public class CreateTicketRequestValidatorTests
             FileName = "archivo.jpg",
             ContentType = "image/jpeg",
             SizeInBytes = 2048,
-            Content = [1, 2, 3]
+            Content = Stream.Null
         };
 }

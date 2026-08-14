@@ -21,6 +21,12 @@ public interface ITicketRepository
         Guid assignedToId,
         CancellationToken cancellationToken = default);
 
+    Task<TicketAttachment?> GetAttachmentByIdAsync(
+        Guid ticketId,
+        Guid attachmentId,
+        Guid companyId,
+        CancellationToken cancellationToken = default);
+
     void Add(Ticket ticket);
 
     void AddComment(TicketComment comment);

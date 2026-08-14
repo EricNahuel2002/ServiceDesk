@@ -31,7 +31,7 @@ public sealed class TicketRepository : ITicketRepository
                 FileName = attachment.FileName,
                 ContentType = attachment.ContentType,
                 SizeInBytes = attachment.SizeInBytes,
-                BlobUrl = attachment.BlobUrl
+                BlobName = attachment.BlobName
             })
             .ToList()
     };
@@ -90,6 +90,18 @@ public sealed class TicketRepository : ITicketRepository
             .Where(ticket => ticket.Id == id
                 && ticket.CompanyId == companyId
                 && ticket.AssignedToId == assignedToId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<TicketAttachment?> GetAttachmentByIdAsync(
+        Guid ticketId,
+        Guid attachmentId,
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketAttachments
+            .AsNoTracking()
+            .Where(attachment => attachment.Id == attachmentId
+                && attachment.TicketId == ticketId
+                && attachment.Ticket!.CompanyId == companyId)
             .SingleOrDefaultAsync(cancellationToken);
 
     public void Add(Ticket ticket) => _context.Tickets.Add(ticket);

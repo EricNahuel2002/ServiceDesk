@@ -8,12 +8,15 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Common;
 using ServiceDesk.Domain.Companies;
 using ServiceDesk.Domain.Identity;
 using ServiceDesk.Domain.Tickets;
 using ServiceDesk.Infrastructure.Persistence;
+using ServiceDesk.IntegrationTests.Fakes;
 
 namespace ServiceDesk.IntegrationTests;
 
@@ -43,6 +46,12 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("Jwt:SecretKey", "TestSecretKey_AtLeast32Characters_LongEnough_123456");
         builder.UseSetting("Jwt:AccessTokenExpirationMinutes", "15");
         builder.UseSetting("Jwt:RefreshTokenExpirationDays", "7");
+
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IBlobStorageService>();
+            services.AddSingleton<IBlobStorageService, FakeBlobStorageService>();
+        });
     }
 
     public async Task<HttpClient> CreateClientForAsync(string email, string password)

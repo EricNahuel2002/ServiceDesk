@@ -25,4 +25,9 @@ public interface ITicketService
         Guid id,
         UpdateTicketRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<AttachmentDownloadResult> DownloadAttachmentAsync(
+        Guid ticketId,
+        Guid attachmentId,
+        CancellationToken cancellationToken = default);
 }

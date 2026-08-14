@@ -27,14 +27,41 @@ public sealed class TicketsController : ControllerBase
         IFormFileCollection? files,
         CancellationToken cancellationToken)
     {
-        CreateTicketRequest requestWithFiles = request with
+        List<TicketFileUpload> uploads = await ReadFilesAsync(files, cancellationToken);
+
+        CreateTicketRequest requestWithFiles = request with { Files = uploads };
+
+        try
         {
-            Files = await ReadFilesAsync(files, cancellationToken)
-        };
+            TicketDto ticket = await _ticketService.CreateAsync(requestWithFiles, cancellationToken);
 
-        TicketDto ticket = await _ticketService.CreateAsync(requestWithFiles, cancellationToken);
+            return CreatedAtAction(nameof(GetMine), new { }, ticket);
+        }
+        finally
+        {
+            foreach (TicketFileUpload upload in uploads)
+            {
+                await upload.Content.DisposeAsync();
+            }
+        }
+    }
 
-        return CreatedAtAction(nameof(GetMine), new { }, ticket);
+    [HttpGet("{ticketId:guid}/attachments/{attachmentId:guid}")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult> DownloadAttachment(
+        Guid ticketId,
+        Guid attachmentId,
+        CancellationToken cancellationToken)
+    {
+        AttachmentDownloadResult result = await _ticketService.DownloadAttachmentAsync(
+            ticketId,
+            attachmentId,
+            cancellationToken);
+
+        return File(result.Content, result.ContentType, result.FileName);
     }
 
     [HttpGet]
@@ -61,15 +88,16 @@ public sealed class TicketsController : ControllerBase
 
         foreach (IFormFile file in files)
         {
-            await using MemoryStream stream = new();
+            MemoryStream stream = new();
             await file.CopyToAsync(stream, cancellationToken);
+            stream.Position = 0;
 
             uploads.Add(new TicketFileUpload
             {
                 FileName = file.FileName,
                 ContentType = file.ContentType,
                 SizeInBytes = file.Length,
-                Content = stream.ToArray()
+                Content = stream
             });
         }
 

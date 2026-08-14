@@ -2,6 +2,7 @@ using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using ServiceDesk.Api.Middleware;
 using ServiceDesk.Application;
+using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Infrastructure;
 using ServiceDesk.Infrastructure.Persistence.Seed;
 
@@ -37,6 +38,9 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 using IServiceScope scope = app.Services.CreateScope();
 ServiceDeskDbInitializer initializer = scope.ServiceProvider.GetRequiredService<ServiceDeskDbInitializer>();
 await initializer.SeedAsync();
+
+IBlobStorageService blobStorage = scope.ServiceProvider.GetRequiredService<IBlobStorageService>();
+await blobStorage.EnsureContainerExistsAsync();
 
 if (app.Environment.IsDevelopment())
 {

@@ -24,6 +24,7 @@ public sealed class TicketService : ITicketService
     private readonly IValidator<UpdateTicketRequest> _updateValidator;
     private readonly IValidator<ResolveTicketRequest> _resolveValidator;
     private readonly IEmailService _email;
+    private readonly IBlobStorageService _blobStorage;
 
     public TicketService(
         ITicketRepository tickets,
@@ -36,7 +37,8 @@ public sealed class TicketService : ITicketService
         IValidator<CreateTicketRequest> validator,
         IValidator<UpdateTicketRequest> updateValidator,
         IValidator<ResolveTicketRequest> resolveValidator,
-        IEmailService email)
+        IEmailService email,
+        IBlobStorageService blobStorage)
     {
         _tickets = tickets;
         _catalog = catalog;
@@ -49,6 +51,7 @@ public sealed class TicketService : ITicketService
         _updateValidator = updateValidator;
         _resolveValidator = resolveValidator;
         _email = email;
+        _blobStorage = blobStorage;
     }
 
     public async Task<TicketDto> CreateAsync(CreateTicketRequest request, CancellationToken cancellationToken)
@@ -75,24 +78,51 @@ public sealed class TicketService : ITicketService
             CreatedById = userId
         };
 
-        foreach (TicketFileUpload file in request.Files)
+        List<TicketAttachment> attachments = new(request.Files.Count);
+        List<string> uploadedBlobNames = new(request.Files.Count);
+
+        try
         {
-            ticket.Attachments.Add(new TicketAttachment
+            foreach (TicketFileUpload file in request.Files)
             {
-                Id = Guid.NewGuid(),
-                TicketId = ticket.Id,
-                UploadedById = userId,
-                FileName = file.FileName,
-                BlobUrl = $"attachments/{ticket.Id}/{file.FileName}",
-                ContentType = file.ContentType,
-                SizeInBytes = file.SizeInBytes,
-                Content = file.Content
-            });
+                Guid attachmentId = Guid.NewGuid();
+                string blobName = BuildBlobName(companyId, ticket.Id, attachmentId);
+
+                await _blobStorage.UploadAsync(
+                    blobName,
+                    file.Content,
+                    file.ContentType,
+                    cancellationToken);
+
+                uploadedBlobNames.Add(blobName);
+
+                attachments.Add(new TicketAttachment
+                {
+                    Id = attachmentId,
+                    TicketId = ticket.Id,
+                    UploadedById = userId,
+                    FileName = file.FileName,
+                    BlobName = blobName,
+                    ContentType = file.ContentType,
+                    SizeInBytes = file.SizeInBytes
+                });
+            }
+
+            ticket.Attachments = attachments;
+
+            _tickets.Add(ticket);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
+        catch
+        {
+            foreach (string blobName in uploadedBlobNames)
+            {
+                await _blobStorage.DeleteAsync(blobName, cancellationToken);
+            }
 
-        _tickets.Add(ticket);
-
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+            throw;
+        }
 
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
@@ -219,6 +249,32 @@ public sealed class TicketService : ITicketService
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
+    public async Task<AttachmentDownloadResult> DownloadAttachmentAsync(
+        Guid ticketId,
+        Guid attachmentId,
+        CancellationToken cancellationToken)
+    {
+        TicketAttachment? attachment = await _tickets.GetAttachmentByIdAsync(
+            ticketId,
+            attachmentId,
+            _currentUser.CompanyId,
+            cancellationToken);
+
+        if (attachment is null)
+        {
+            throw new NotFoundException($"El archivo adjunto {attachmentId} no existe.");
+        }
+
+        Stream content = await _blobStorage.DownloadAsync(attachment.BlobName, cancellationToken);
+
+        return new AttachmentDownloadResult
+        {
+            Content = content,
+            ContentType = attachment.ContentType,
+            FileName = attachment.FileName
+        };
+    }
+
     private async Task<ApplicationUser> EnsureTechnicianValidAsync(Guid technicianId, CancellationToken cancellationToken)
     {
         ApplicationUser? technician = await _users.GetByIdAsync(technicianId, cancellationToken);
@@ -308,4 +364,7 @@ public sealed class TicketService : ITicketService
 
         return priorityId.Value;
     }
+
+    private static string BuildBlobName(Guid companyId, Guid ticketId, Guid attachmentId) =>
+        $"{companyId:N}/{ticketId:N}/{attachmentId:N}";
 }

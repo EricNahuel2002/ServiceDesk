@@ -10,5 +10,5 @@ public sealed record TicketAttachmentDto
 
     public long SizeInBytes { get; init; }
 
-    public string BlobUrl { get; init; } = string.Empty;
+    public string BlobName { get; init; } = string.Empty;
 }
