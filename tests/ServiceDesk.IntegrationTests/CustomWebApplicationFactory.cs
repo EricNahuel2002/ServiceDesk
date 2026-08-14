@@ -51,6 +51,9 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IBlobStorageService>();
             services.AddSingleton<IBlobStorageService, FakeBlobStorageService>();
+
+            services.RemoveAll<IQueueStorageService>();
+            services.AddSingleton<IQueueStorageService, FakeQueueStorageService>();
         });
     }
 
@@ -177,6 +180,17 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             .Where(c => c.TicketId == ticketId)
             .CountAsync();
     }
+
+    public void ResetQueue()
+    {
+        FakeQueueStorageService queue = GetQueueService();
+        queue.Clear();
+    }
+
+    public IReadOnlyList<string> GetQueueMessages() => GetQueueService().Messages;
+
+    private FakeQueueStorageService GetQueueService() =>
+        (FakeQueueStorageService)Services.GetRequiredService<IQueueStorageService>();
 
     public async Task ResetTicketsAsync()
     {

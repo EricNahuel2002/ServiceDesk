@@ -90,12 +90,18 @@ public static class DependencyInjection
         services.Configure<BlobStorageSettings>(configuration.GetSection(BlobStorageSettingsSection));
         services.AddScoped<IBlobStorageService, BlobStorageService>();
 
+        QueueStorageSettings queueStorageSettings = ReadQueueStorageSettings(configuration);
+        services.Configure<QueueStorageSettings>(configuration.GetSection(QueueStorageSettingsSection));
+        services.AddScoped<IQueueStorageService, QueueStorageService>();
+
         return services;
     }
 
     private const string EmailSettingsSection = "Email";
 
     private const string BlobStorageSettingsSection = "BlobStorage";
+
+    private const string QueueStorageSettingsSection = "QueueStorage";
 
     private static EmailSettings ReadEmailSettings(IConfiguration configuration)
     {
@@ -107,6 +113,20 @@ public static class DependencyInjection
         {
             throw new InvalidOperationException(
                 "La sección Email está habilitada pero faltan valores obligatorios (Host, FromEmail).");
+        }
+
+        return settings;
+    }
+
+    private static QueueStorageSettings ReadQueueStorageSettings(IConfiguration configuration)
+    {
+        QueueStorageSettings settings =
+            configuration.GetSection(QueueStorageSettingsSection).Get<QueueStorageSettings>() ?? new QueueStorageSettings();
+
+        if (settings.Enabled && string.IsNullOrWhiteSpace(settings.ConnectionString))
+        {
+            throw new InvalidOperationException(
+                "La sección QueueStorage está habilitada pero falta ConnectionString.");
         }
 
         return settings;

@@ -1,7 +1,9 @@
+using System.Text.Json;
 using FluentValidation;
 using ServiceDesk.Application.Common.Exceptions;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.Common.Validation;
+using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Common;
@@ -25,6 +27,7 @@ public sealed class TicketService : ITicketService
     private readonly IValidator<ResolveTicketRequest> _resolveValidator;
     private readonly IEmailService _email;
     private readonly IBlobStorageService _blobStorage;
+    private readonly IQueueStorageService _queueStorage;
 
     public TicketService(
         ITicketRepository tickets,
@@ -38,7 +41,8 @@ public sealed class TicketService : ITicketService
         IValidator<UpdateTicketRequest> updateValidator,
         IValidator<ResolveTicketRequest> resolveValidator,
         IEmailService email,
-        IBlobStorageService blobStorage)
+        IBlobStorageService blobStorage,
+        IQueueStorageService queueStorage)
     {
         _tickets = tickets;
         _catalog = catalog;
@@ -52,6 +56,7 @@ public sealed class TicketService : ITicketService
         _resolveValidator = resolveValidator;
         _email = email;
         _blobStorage = blobStorage;
+        _queueStorage = queueStorage;
     }
 
     public async Task<TicketDto> CreateAsync(CreateTicketRequest request, CancellationToken cancellationToken)
@@ -311,6 +316,15 @@ public sealed class TicketService : ITicketService
         ApplicationUser technician,
         CancellationToken cancellationToken)
     {
+        await SendAssignedEmailAsync(ticket, technician, cancellationToken);
+        await EnqueueAssignedNotificationAsync(ticket, cancellationToken);
+    }
+
+    private async Task SendAssignedEmailAsync(
+        Ticket ticket,
+        ApplicationUser technician,
+        CancellationToken cancellationToken)
+    {
         if (string.IsNullOrWhiteSpace(technician.Email))
         {
             return;
@@ -333,6 +347,20 @@ public sealed class TicketService : ITicketService
             """;
 
         await _email.SendAsync(technician.Email, subject, body, cancellationToken);
+    }
+
+    private async Task EnqueueAssignedNotificationAsync(
+        Ticket ticket,
+        CancellationToken cancellationToken)
+    {
+        TicketAssignedNotification notification = new()
+        {
+            TicketId = ticket.Id
+        };
+
+        string payload = JsonSerializer.Serialize(notification);
+
+        await _queueStorage.EnqueueAsync(payload, cancellationToken);
     }
 
     private async Task<Guid> FindInitialStatusIdAsync(Guid companyId, CancellationToken cancellationToken)

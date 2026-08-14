@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceDesk.Application.Common.Exceptions;
 using ServiceDesk.Application.Common.Interfaces;
+using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Domain.Identity;
 
@@ -403,6 +405,65 @@ public sealed class TicketServiceTests
                         StatusId = statusId
                     }));
         });
+    }
+
+    [Fact]
+    public async Task UpdateAsync_EnqueuesAssignedNotification_WhenTicketIsAssigned()
+    {
+        await _factory.ResetTicketsAsync();
+        _factory.ResetQueue();
+        (Guid companyId, Guid adminId, Guid technicianId, _) = await GetSeedAsync();
+        Guid ticketId = await CreateTicketAsync(companyId, "Para asignar");
+        (_, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+
+        await _factory.RunAsAsync(adminId, companyId, Roles.Administrador, async scope =>
+        {
+            ITicketService service = scope.ServiceProvider.GetRequiredService<ITicketService>();
+
+            await service.UpdateAsync(
+                ticketId,
+                new UpdateTicketRequest
+                {
+                    AssignedToId = technicianId,
+                    PriorityId = priorityId,
+                    StatusId = statusId
+                });
+        });
+
+        string message = Assert.Single(_factory.GetQueueMessages());
+
+        TicketAssignedNotification notification =
+            JsonSerializer.Deserialize<TicketAssignedNotification>(message)
+            ?? throw new InvalidOperationException("El mensaje encolado no es válido.");
+
+        Assert.Equal("TicketAssigned", notification.EventType);
+        Assert.Equal(ticketId, notification.TicketId);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_DoesNotEnqueue_WhenAssignmentDoesNotChange()
+    {
+        await _factory.ResetTicketsAsync();
+        _factory.ResetQueue();
+        (Guid companyId, Guid adminId, Guid technicianId, _) = await GetSeedAsync();
+        Guid ticketId = await CreateTicketAsync(companyId, "Ya asignado", assignedToId: technicianId);
+        (_, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+
+        await _factory.RunAsAsync(adminId, companyId, Roles.Administrador, async scope =>
+        {
+            ITicketService service = scope.ServiceProvider.GetRequiredService<ITicketService>();
+
+            await service.UpdateAsync(
+                ticketId,
+                new UpdateTicketRequest
+                {
+                    AssignedToId = technicianId,
+                    PriorityId = priorityId,
+                    StatusId = statusId
+                });
+        });
+
+        Assert.Empty(_factory.GetQueueMessages());
     }
 
     private async Task<(Guid CompanyId, Guid AdminId, Guid TechnicianId, Guid ClientId)> GetSeedAsync()
