@@ -107,7 +107,9 @@ public sealed class TicketRepository : ITicketRepository
                 PriorityName = ticket.Priority!.Name,
                 AssignedToFirstName = ticket.AssignedTo!.FirstName,
                 AssignedToLastName = ticket.AssignedTo!.LastName,
-                AssignedToEmail = ticket.AssignedTo!.Email ?? string.Empty
+                AssignedToEmail = ticket.AssignedTo!.Email ?? string.Empty,
+                RequesterFirstName = ticket.CreatedBy!.FirstName,
+                RequesterEmail = ticket.CreatedBy!.Email ?? string.Empty
             })
             .SingleOrDefaultAsync(cancellationToken);
 

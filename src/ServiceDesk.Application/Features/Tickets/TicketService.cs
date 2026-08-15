@@ -246,6 +246,7 @@ public sealed class TicketService : ITicketService
         if (wasReassigned)
         {
             await EnqueueAssignedNotificationAsync(ticket, cancellationToken);
+            await EnqueueClientAssignedNotificationAsync(ticket, cancellationToken);
         }
 
         return await GetByIdAsync(ticket.Id, cancellationToken);
@@ -314,12 +315,28 @@ public sealed class TicketService : ITicketService
     {
         TicketAssignedNotification notification = new()
         {
+            EventType = NotificationEvents.TicketAssigned,
             TicketId = ticket.Id
         };
 
         string payload = JsonSerializer.Serialize(notification);
 
         await _queueStorage.EnqueueAsync(payload, cancellationToken);
+    }
+
+    private async Task EnqueueClientAssignedNotificationAsync(
+        Ticket ticket,
+        CancellationToken cancellationToken)
+    {
+        TicketAssignedNotification notification = new()
+        {
+            EventType = NotificationEvents.TicketAssignedToClient,
+            TicketId = ticket.Id
+        };
+
+        string payload = JsonSerializer.Serialize(notification);
+
+        await _queueStorage.EnqueueClientNotificationAsync(payload, cancellationToken);
     }
 
     private async Task<Guid> FindInitialStatusIdAsync(Guid companyId, CancellationToken cancellationToken)

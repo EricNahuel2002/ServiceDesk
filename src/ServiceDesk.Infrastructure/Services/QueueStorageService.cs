@@ -25,9 +25,18 @@ public sealed class QueueStorageService : IQueueStorageService
         }
     }
 
-    public async Task EnqueueAsync(string message, CancellationToken cancellationToken = default)
+    public Task EnqueueAsync(string message, CancellationToken cancellationToken = default) =>
+        EnqueueToQueueAsync(_settings.QueueName, message, cancellationToken);
+
+    public Task EnqueueClientNotificationAsync(string message, CancellationToken cancellationToken = default) =>
+        EnqueueToQueueAsync(_settings.ClientNotificationQueueName, message, cancellationToken);
+
+    private async Task EnqueueToQueueAsync(
+        string queueName,
+        string message,
+        CancellationToken cancellationToken)
     {
-        if (!TryGetQueue(out QueueClient queue))
+        if (!TryGetQueue(queueName, out QueueClient queue))
         {
             return;
         }
@@ -41,7 +50,7 @@ public sealed class QueueStorageService : IQueueStorageService
 
             _logger.LogInformation(
                 "Mensaje encolado en {QueueName} con MessageId {MessageId}",
-                _settings.QueueName,
+                queueName,
                 response.Value.MessageId);
         }
         catch (Exception exception)
@@ -49,11 +58,11 @@ public sealed class QueueStorageService : IQueueStorageService
             _logger.LogError(
                 exception,
                 "Falló el envío de mensaje a la cola {QueueName}",
-                _settings.QueueName);
+                queueName);
         }
     }
 
-    private bool TryGetQueue(out QueueClient queue)
+    private bool TryGetQueue(string queueName, out QueueClient queue)
     {
         if (_serviceClient is null)
         {
@@ -65,7 +74,7 @@ public sealed class QueueStorageService : IQueueStorageService
             return false;
         }
 
-        queue = _serviceClient.GetQueueClient(_settings.QueueName);
+        queue = _serviceClient.GetQueueClient(queueName);
 
         return true;
     }

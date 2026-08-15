@@ -203,6 +203,8 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     public IReadOnlyList<string> GetQueueMessages() => GetQueueService().Messages;
 
+    public IReadOnlyList<string> GetClientQueueMessages() => GetQueueService().ClientMessages;
+
     private FakeQueueStorageService GetQueueService() =>
         (FakeQueueStorageService)Services.GetRequiredService<IQueueStorageService>();
 

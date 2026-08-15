@@ -1,3 +1,5 @@
+using ServiceDesk.Application.DTOs.Notifications;
+
 namespace ServiceDesk.Application.Configuration;
 
 public sealed class QueueStorageSettings
@@ -6,5 +8,7 @@ public sealed class QueueStorageSettings
 
     public string ConnectionString { get; set; } = string.Empty;
 
-    public string QueueName { get; set; } = "ticket-notifications";
+    public string QueueName { get; set; } = NotificationQueues.TicketAssigned;
+
+    public string ClientNotificationQueueName { get; set; } = NotificationQueues.TicketAssignedToClient;
 }

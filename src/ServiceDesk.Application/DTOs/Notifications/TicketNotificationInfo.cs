@@ -15,4 +15,8 @@ public sealed record TicketNotificationInfo
     public string AssignedToLastName { get; init; } = string.Empty;
 
     public string AssignedToEmail { get; init; } = string.Empty;
+
+    public string RequesterFirstName { get; init; } = string.Empty;
+
+    public string RequesterEmail { get; init; } = string.Empty;
 }

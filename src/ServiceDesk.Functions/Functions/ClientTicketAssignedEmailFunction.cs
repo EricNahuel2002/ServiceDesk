@@ -6,33 +6,33 @@ using ServiceDesk.Application.DTOs.Notifications;
 
 namespace ServiceDesk.Functions.Functions;
 
-public sealed class TicketAssignedEmailFunction
+public sealed class ClientTicketAssignedEmailFunction
 {
     private readonly ITicketRepository _tickets;
     private readonly IEmailService _email;
-    private readonly ILogger<TicketAssignedEmailFunction> _logger;
+    private readonly ILogger<ClientTicketAssignedEmailFunction> _logger;
 
-    public TicketAssignedEmailFunction(
+    public ClientTicketAssignedEmailFunction(
         ITicketRepository tickets,
         IEmailService email,
-        ILogger<TicketAssignedEmailFunction> logger)
+        ILogger<ClientTicketAssignedEmailFunction> logger)
     {
         _tickets = tickets;
         _email = email;
         _logger = logger;
     }
 
-    [Function(nameof(TicketAssignedEmailFunction))]
+    [Function(nameof(ClientTicketAssignedEmailFunction))]
     public async Task Run(
-        [QueueTrigger(NotificationQueues.TicketAssigned)] string message,
+        [QueueTrigger(NotificationQueues.TicketAssignedToClient)] string message,
         CancellationToken cancellationToken)
     {
         TicketAssignedNotification notification = Deserialize(message);
 
-        if (!string.Equals(notification.EventType, NotificationEvents.TicketAssigned, StringComparison.Ordinal))
+        if (!string.Equals(notification.EventType, NotificationEvents.TicketAssignedToClient, StringComparison.Ordinal))
         {
             _logger.LogInformation(
-                "Se ignoró el evento {EventType} de la cola de notificaciones.",
+                "Se ignoró el evento {EventType} de la cola de notificaciones al cliente.",
                 notification.EventType);
 
             return;
@@ -45,7 +45,7 @@ public sealed class TicketAssignedEmailFunction
         if (info is null)
         {
             _logger.LogWarning(
-                "No se encontró el ticket {TicketId} o no tiene un técnico asignado; se omite la notificación.",
+                "No se encontró el ticket {TicketId} o no tiene un técnico asignado; se omite la notificación al cliente.",
                 notification.TicketId);
 
             return;
@@ -54,7 +54,7 @@ public sealed class TicketAssignedEmailFunction
         string subject = BuildSubject(info);
         string body = BuildBody(info);
 
-        await _email.SendAsync(info.AssignedToEmail, subject, body, cancellationToken);
+        await _email.SendAsync(info.RequesterEmail, subject, body, cancellationToken);
     }
 
     private static TicketAssignedNotification Deserialize(string message)
@@ -67,17 +67,19 @@ public sealed class TicketAssignedEmailFunction
     }
 
     internal static string BuildSubject(TicketNotificationInfo info) =>
-        $"Se te asignó un ticket: {info.Title}";
+        $"Un técnico está en camino para tu ticket: {info.Title}";
 
     internal static string BuildBody(TicketNotificationInfo info) =>
         $"""
-        Hola {info.AssignedToFirstName},
+        Hola {info.RequesterFirstName},
 
-        Se te asignó el siguiente ticket:
+        Te informamos que el técnico {info.AssignedToFirstName} {info.AssignedToLastName}
+        fue asignado a tu ticket "{info.Title}" y está en camino para atenderlo.
 
-        Título: {info.Title}
-        Descripción: {info.Description}
         Prioridad: {info.PriorityName}
+        Descripción: {info.Description}
+
+        Si necesitás más información, podés contactar al administrador de tu empresa.
 
         Saludos,
         ServiceDesk

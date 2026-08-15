@@ -6,6 +6,7 @@ namespace ServiceDesk.IntegrationTests.Fakes;
 public sealed class FakeQueueStorageService : IQueueStorageService
 {
     private readonly ConcurrentQueue<string> _messages = new();
+    private readonly ConcurrentQueue<string> _clientMessages = new();
 
     public Task EnqueueAsync(string message, CancellationToken cancellationToken = default)
     {
@@ -14,7 +15,20 @@ public sealed class FakeQueueStorageService : IQueueStorageService
         return Task.CompletedTask;
     }
 
+    public Task EnqueueClientNotificationAsync(string message, CancellationToken cancellationToken = default)
+    {
+        _clientMessages.Enqueue(message);
+
+        return Task.CompletedTask;
+    }
+
     public IReadOnlyList<string> Messages => _messages.ToArray();
 
-    public void Clear() => _messages.Clear();
+    public IReadOnlyList<string> ClientMessages => _clientMessages.ToArray();
+
+    public void Clear()
+    {
+        _messages.Clear();
+        _clientMessages.Clear();
+    }
 }
