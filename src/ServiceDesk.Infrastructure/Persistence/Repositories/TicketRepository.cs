@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using ServiceDesk.Application.Common.Interfaces;
+using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Domain.Tickets;
 
@@ -90,6 +91,24 @@ public sealed class TicketRepository : ITicketRepository
             .Where(ticket => ticket.Id == id
                 && ticket.CompanyId == companyId
                 && ticket.AssignedToId == assignedToId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<TicketNotificationInfo?> GetTicketNotificationInfoAsync(
+        Guid ticketId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Tickets
+            .AsNoTracking()
+            .Where(ticket => ticket.Id == ticketId && ticket.AssignedToId != null)
+            .Select(ticket => new TicketNotificationInfo
+            {
+                TicketId = ticket.Id,
+                Title = ticket.Title,
+                Description = ticket.Description,
+                PriorityName = ticket.Priority!.Name,
+                AssignedToFirstName = ticket.AssignedTo!.FirstName,
+                AssignedToLastName = ticket.AssignedTo!.LastName,
+                AssignedToEmail = ticket.AssignedTo!.Email ?? string.Empty
+            })
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<TicketAttachment?> GetAttachmentByIdAsync(

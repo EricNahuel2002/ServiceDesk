@@ -25,7 +25,6 @@ public sealed class TicketService : ITicketService
     private readonly IValidator<CreateTicketRequest> _validator;
     private readonly IValidator<UpdateTicketRequest> _updateValidator;
     private readonly IValidator<ResolveTicketRequest> _resolveValidator;
-    private readonly IEmailService _email;
     private readonly IBlobStorageService _blobStorage;
     private readonly IQueueStorageService _queueStorage;
 
@@ -40,7 +39,6 @@ public sealed class TicketService : ITicketService
         IValidator<CreateTicketRequest> validator,
         IValidator<UpdateTicketRequest> updateValidator,
         IValidator<ResolveTicketRequest> resolveValidator,
-        IEmailService email,
         IBlobStorageService blobStorage,
         IQueueStorageService queueStorage)
     {
@@ -54,7 +52,6 @@ public sealed class TicketService : ITicketService
         _validator = validator;
         _updateValidator = updateValidator;
         _resolveValidator = resolveValidator;
-        _email = email;
         _blobStorage = blobStorage;
         _queueStorage = queueStorage;
     }
@@ -232,7 +229,7 @@ public sealed class TicketService : ITicketService
             throw new NotFoundException($"El ticket con id {id} no existe.");
         }
 
-        ApplicationUser technician = await EnsureTechnicianValidAsync(request.AssignedToId, cancellationToken);
+        await EnsureTechnicianValidAsync(request.AssignedToId, cancellationToken);
 
         bool wasReassigned = ticket.AssignedToId != request.AssignedToId;
 
@@ -248,7 +245,7 @@ public sealed class TicketService : ITicketService
 
         if (wasReassigned)
         {
-            await SendAssignedNotificationAsync(ticket, technician, cancellationToken);
+            await EnqueueAssignedNotificationAsync(ticket, cancellationToken);
         }
 
         return await GetByIdAsync(ticket.Id, cancellationToken);
@@ -309,44 +306,6 @@ public sealed class TicketService : ITicketService
         }
 
         return technician;
-    }
-
-    private async Task SendAssignedNotificationAsync(
-        Ticket ticket,
-        ApplicationUser technician,
-        CancellationToken cancellationToken)
-    {
-        await SendAssignedEmailAsync(ticket, technician, cancellationToken);
-        await EnqueueAssignedNotificationAsync(ticket, cancellationToken);
-    }
-
-    private async Task SendAssignedEmailAsync(
-        Ticket ticket,
-        ApplicationUser technician,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(technician.Email))
-        {
-            return;
-        }
-
-        Priority? priority = await _catalog.GetPriorityByIdAsync(ticket.PriorityId, cancellationToken);
-
-        string subject = "Se te asignó un ticket";
-        string body = $"""
-            Hola {technician.FirstName},
-
-            Se te asignó el siguiente ticket:
-
-            Título: {ticket.Title}
-            Descripción: {ticket.Description}
-            Prioridad: {priority?.Name ?? "No especificada"}
-
-            Saludos,
-            ServiceDesk
-            """;
-
-        await _email.SendAsync(technician.Email, subject, body, cancellationToken);
     }
 
     private async Task EnqueueAssignedNotificationAsync(

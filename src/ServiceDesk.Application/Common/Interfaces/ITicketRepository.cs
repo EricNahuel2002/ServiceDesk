@@ -1,3 +1,4 @@
+using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Domain.Tickets;
 
@@ -19,6 +20,10 @@ public interface ITicketRepository
         Guid id,
         Guid companyId,
         Guid assignedToId,
+        CancellationToken cancellationToken = default);
+
+    Task<TicketNotificationInfo?> GetTicketNotificationInfoAsync(
+        Guid ticketId,
         CancellationToken cancellationToken = default);
 
     Task<TicketAttachment?> GetAttachmentByIdAsync(

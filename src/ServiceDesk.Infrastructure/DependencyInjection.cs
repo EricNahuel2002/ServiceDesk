@@ -83,10 +83,6 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<ServiceDeskDbInitializer>();
 
-        EmailSettings emailSettings = ReadEmailSettings(configuration);
-        services.Configure<EmailSettings>(configuration.GetSection(EmailSettingsSection));
-        services.AddScoped<IEmailService, EmailService>();
-
         services.Configure<BlobStorageSettings>(configuration.GetSection(BlobStorageSettingsSection));
         services.AddScoped<IBlobStorageService, BlobStorageService>();
 
@@ -97,22 +93,41 @@ public static class DependencyInjection
         return services;
     }
 
-    private const string EmailSettingsSection = "Email";
+    public static IServiceCollection AddNotificationServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddDbContext<ServiceDeskDbContext>(options =>
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+
+        services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ServiceDeskDbContext>());
+        services.AddScoped<ITicketRepository, TicketRepository>();
+
+        _ = ReadCommunicationServicesSettings(configuration);
+        services.Configure<CommunicationServicesSettings>(configuration.GetSection(CommunicationServicesSettingsSection));
+        services.AddScoped<IEmailService, CommunicationServicesEmailService>();
+
+        return services;
+    }
+
+    private const string CommunicationServicesSettingsSection = "CommunicationServices";
 
     private const string BlobStorageSettingsSection = "BlobStorage";
 
     private const string QueueStorageSettingsSection = "QueueStorage";
 
-    private static EmailSettings ReadEmailSettings(IConfiguration configuration)
+    private static CommunicationServicesSettings ReadCommunicationServicesSettings(IConfiguration configuration)
     {
-        EmailSettings settings = configuration.GetSection(EmailSettingsSection).Get<EmailSettings>() ?? new EmailSettings();
+        CommunicationServicesSettings settings =
+            configuration.GetSection(CommunicationServicesSettingsSection).Get<CommunicationServicesSettings>()
+            ?? new CommunicationServicesSettings();
 
         if (settings.Enabled
-            && (string.IsNullOrWhiteSpace(settings.Host)
-                || string.IsNullOrWhiteSpace(settings.FromEmail)))
+            && (string.IsNullOrWhiteSpace(settings.ConnectionString)
+                || string.IsNullOrWhiteSpace(settings.SenderAddress)))
         {
             throw new InvalidOperationException(
-                "La sección Email está habilitada pero faltan valores obligatorios (Host, FromEmail).");
+                "La sección CommunicationServices está habilitada pero faltan valores obligatorios (ConnectionString, SenderAddress).");
         }
 
         return settings;

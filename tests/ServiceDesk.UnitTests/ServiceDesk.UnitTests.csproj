@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ServiceDesk.Application\ServiceDesk.Application.csproj" />
     <ProjectReference Include="..\..\src\ServiceDesk.Domain\ServiceDesk.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ServiceDesk.Functions\ServiceDesk.Functions.csproj" />
     <ProjectReference Include="..\..\src\ServiceDesk.Infrastructure\ServiceDesk.Infrastructure.csproj" />
   </ItemGroup>
 
