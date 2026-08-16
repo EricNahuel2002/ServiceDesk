@@ -26,6 +26,12 @@ public sealed record TicketDto
 
     public Guid? AssignedToId { get; init; }
 
+    public string? AssignedToFirstName { get; init; }
+
+    public string? AssignedToLastName { get; init; }
+
+    public string? AssignedToEmail { get; init; }
+
     public DateTime CreatedAtUtc { get; init; }
 
     public DateTime? UpdatedAtUtc { get; init; }

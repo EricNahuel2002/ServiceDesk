@@ -20,6 +20,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
@@ -33,6 +34,25 @@ builder.Services.AddSwaggerGen(options =>
     options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
         [new OpenApiSecuritySchemeReference("bearer", document)] = []
+    });
+});
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", policy =>
+    {
+        string[] allowedOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? [];
+
+        if (allowedOrigins.Length == 0)
+        {
+            allowedOrigins = ["http://localhost:5173", "http://127.0.0.1:5173"];
+        }
+
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
     });
 });
 
@@ -57,7 +77,12 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
+app.UseCors("CorsPolicy");
 
 app.UseAuthentication();
 

@@ -23,6 +23,9 @@ public sealed class TicketRepository : ITicketRepository
         StatusName = ticket.Status!.Name,
         CreatedById = ticket.CreatedById,
         AssignedToId = ticket.AssignedToId,
+        AssignedToFirstName = ticket.AssignedTo!.FirstName,
+        AssignedToLastName = ticket.AssignedTo!.LastName,
+        AssignedToEmail = ticket.AssignedTo!.Email,
         CreatedAtUtc = ticket.CreatedAtUtc,
         UpdatedAtUtc = ticket.UpdatedAtUtc,
         Attachments = ticket.Attachments

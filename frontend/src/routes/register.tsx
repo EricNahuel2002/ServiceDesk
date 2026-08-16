@@ -36,14 +36,14 @@ function RegisterPage() {
     }
     try {
       await register(request)
-      await navigate({ to: '/dashboard' })
+      await navigate({ to: '/tickets' })
     } catch {
       setError('No se pudo completar el registro.')
     }
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" />
+    return <Navigate to="/tickets" />
   }
 
   return (
@@ -98,7 +98,7 @@ function RegisterPage() {
         </form>
         <p className="mt-4 text-sm text-gray-500">
           ¿Ya tenés cuenta?{' '}
-          <Link to="/login" className="text-blue-600 hover:underline">
+          <Link to="/login" className="text-emerald-600 hover:underline">
             Iniciá sesión
           </Link>
         </p>

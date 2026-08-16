@@ -25,14 +25,14 @@ function LoginPage() {
     setError(null)
     try {
       await login(email, password)
-      await navigate({ to: '/dashboard' })
+      await navigate({ to: '/tickets' })
     } catch {
       setError('Credenciales inválidas.')
     }
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" />
+    return <Navigate to="/tickets" />
   }
 
   return (
@@ -65,7 +65,7 @@ function LoginPage() {
         </form>
         <p className="mt-4 text-sm text-gray-500">
           ¿No tenés cuenta?{' '}
-          <Link to="/register" className="text-blue-600 hover:underline">
+          <Link to="/register" className="text-emerald-600 hover:underline">
             Registrate
           </Link>
         </p>

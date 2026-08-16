@@ -6,4 +6,12 @@ import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [TanStackRouterVite(), react(), tailwindcss()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5216',
+        changeOrigin: true,
+      },
+    },
+  },
 })

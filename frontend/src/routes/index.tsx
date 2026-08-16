@@ -9,7 +9,7 @@ function HomePage() {
   const { isAuthenticated } = useAuth()
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" />
+    return <Navigate to="/tickets" />
   }
 
   return (
@@ -19,7 +19,7 @@ function HomePage() {
       <div className="mt-4 flex gap-3">
         <Link
           to="/login"
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
         >
           Iniciar sesión
         </Link>

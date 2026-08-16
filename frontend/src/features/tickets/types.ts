@@ -19,6 +19,9 @@ export interface TicketDto {
   statusName: string
   createdById: string
   assignedToId: string | null
+  assignedToFirstName: string | null
+  assignedToLastName: string | null
+  assignedToEmail: string | null
   createdAtUtc: string
   updatedAtUtc: string | null
   attachments: TicketAttachmentDto[]

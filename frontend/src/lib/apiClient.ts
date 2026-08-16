@@ -27,14 +27,16 @@ export class ApiError extends Error {
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, headers, ...init } = options
 
+  const isFormData = body instanceof FormData
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...headers,
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
   })
 
   if (!response.ok) {
@@ -55,6 +57,8 @@ export const apiClient = {
   get: <T>(path: string): Promise<T> => request<T>(path),
   post: <T>(path: string, body?: unknown): Promise<T> =>
     request<T>(path, { method: 'POST', body }),
+  postForm: <T>(path: string, formData: FormData): Promise<T> =>
+    request<T>(path, { method: 'POST', body: formData }),
   put: <T>(path: string, body?: unknown): Promise<T> =>
     request<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown): Promise<T> =>
