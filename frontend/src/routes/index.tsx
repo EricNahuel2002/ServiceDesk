@@ -6,9 +6,12 @@ export const Route = createFileRoute('/')({
 })
 
 function HomePage() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   if (isAuthenticated) {
+    if (user?.role === 'Administrador') {
+      return <Navigate to="/admin" />
+    }
     return <Navigate to="/tickets" />
   }
 
