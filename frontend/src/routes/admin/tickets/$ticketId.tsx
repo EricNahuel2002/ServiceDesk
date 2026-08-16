@@ -6,10 +6,12 @@ import { Select } from '../../../components/common/Select'
 import { Button } from '../../../components/common/Button'
 import { AdminAppShell } from '../../../components/layout/AdminAppShell'
 import { useAdminTicket, useTechnicians, useUpdateTicket } from '../../../features/admin/queries'
+import { requireAdmin } from '../../../features/admin/auth'
 import { usePriorities, useStatuses } from '../../../features/catalog/queries'
 import { formatDate } from '../../../utils/format'
 
 export const Route = createFileRoute('/admin/tickets/$ticketId')({
+  beforeLoad: () => requireAdmin(),
   component: AdminTicketDetailPage,
 })
 

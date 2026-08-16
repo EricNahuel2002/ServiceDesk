@@ -8,10 +8,12 @@ import { Textarea } from '../../components/common/Textarea'
 import { AppShell } from '../../components/layout/AppShell'
 import { useCategories } from '../../features/catalog/queries'
 import { useCreateTicket } from '../../features/tickets/queries'
+import { requireCliente } from '../../features/tickets/auth'
 import { ApiError } from '../../lib/apiClient'
 import type { ApiErrorPayload } from '../../types/api'
 
 export const Route = createFileRoute('/tickets/')({
+  beforeLoad: () => requireCliente(),
   component: CreateTicketPage,
 })
 

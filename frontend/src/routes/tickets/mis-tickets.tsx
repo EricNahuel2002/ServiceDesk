@@ -4,8 +4,10 @@ import { Card } from '../../components/common/Card'
 import { AppShell } from '../../components/layout/AppShell'
 import { TicketFields } from '../../components/tickets/TicketFields'
 import { useTickets, useIsTicketClosed } from '../../features/tickets/queries'
+import { requireCliente } from '../../features/tickets/auth'
 
 export const Route = createFileRoute('/tickets/mis-tickets')({
+  beforeLoad: () => requireCliente(),
   component: MyTicketsPage,
 })
 

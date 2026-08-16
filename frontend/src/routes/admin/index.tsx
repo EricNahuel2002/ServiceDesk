@@ -4,9 +4,11 @@ import { Card } from '../../components/common/Card'
 import { Badge } from '../../components/common/Badge'
 import { AdminAppShell } from '../../components/layout/AdminAppShell'
 import { useAdminTickets, useIsTicketClosed } from '../../features/admin/queries'
+import { requireAdmin } from '../../features/admin/auth'
 import { formatDate } from '../../utils/format'
 
 export const Route = createFileRoute('/admin/')({
+  beforeLoad: () => requireAdmin(),
   component: AdminDashboardPage,
 })
 
