@@ -12,6 +12,9 @@ function HomePage() {
     if (user?.role === 'Administrador') {
       return <Navigate to="/admin" />
     }
+    if (user?.role === 'Tecnico') {
+      return <Navigate to="/technician" />
+    }
     return <Navigate to="/tickets" />
   }
 
