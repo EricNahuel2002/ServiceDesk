@@ -7,8 +7,10 @@ import type {
   UpdatePriorityRequest,
   CreateStatusRequest,
   UpdateStatusRequest,
+  CreateUserRequest,
 } from './types'
 import type { CategoryDto, PriorityDto, StatusDto } from '../catalog/types'
+import type { UserListItemDto } from './types'
 
 export function getAllTickets(): Promise<TicketDto[]> {
   return apiClient.get<TicketDto[]>('/admin/tickets')
@@ -60,4 +62,12 @@ export function createStatus(data: CreateStatusRequest): Promise<StatusDto> {
 
 export function updateStatus(id: string, data: UpdateStatusRequest): Promise<StatusDto> {
   return apiClient.put<StatusDto>(`/admin/catalog/statuses/${id}`, data)
+}
+
+export function getAllUsers(): Promise<UserListItemDto[]> {
+  return apiClient.get<UserListItemDto[]>('/users')
+}
+
+export function createUser(data: CreateUserRequest): Promise<unknown> {
+  return apiClient.post('/users', data)
 }

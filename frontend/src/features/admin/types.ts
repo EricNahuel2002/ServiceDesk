@@ -39,3 +39,13 @@ export interface CreateUserRequest {
   companyId: string
   role: string
 }
+
+export interface UserListItemDto {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  role: string
+  isActive: boolean
+  createdAtUtc: string
+}

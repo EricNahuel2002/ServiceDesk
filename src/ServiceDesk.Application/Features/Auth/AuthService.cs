@@ -6,6 +6,7 @@ using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.Common.Validation;
 using ServiceDesk.Application.Configuration;
 using ServiceDesk.Application.DTOs.Auth;
+using ServiceDesk.Application.DTOs.Users;
 using ServiceDesk.Domain.Identity;
 using ValidationException = ServiceDesk.Application.Common.Exceptions.ValidationException;
 
@@ -24,6 +25,7 @@ public sealed class AuthService : IAuthService
     private readonly IValidator<RefreshTokenRequest> _refreshTokenValidator;
     private readonly IValidator<LogoutRequest> _logoutValidator;
     private readonly IValidator<AdminCreateUserRequest> _adminCreateUserValidator;
+    private readonly IUserRepository _users;
 
     public AuthService(
         IIdentityService identityService,
@@ -36,7 +38,8 @@ public sealed class AuthService : IAuthService
         IValidator<LoginRequest> loginValidator,
         IValidator<RefreshTokenRequest> refreshTokenValidator,
         IValidator<LogoutRequest> logoutValidator,
-        IValidator<AdminCreateUserRequest> adminCreateUserValidator)
+        IValidator<AdminCreateUserRequest> adminCreateUserValidator,
+        IUserRepository users)
     {
         _identityService = identityService;
         _refreshTokens = refreshTokens;
@@ -49,6 +52,7 @@ public sealed class AuthService : IAuthService
         _refreshTokenValidator = refreshTokenValidator;
         _logoutValidator = logoutValidator;
         _adminCreateUserValidator = adminCreateUserValidator;
+        _users = users;
     }
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken)
@@ -137,6 +141,11 @@ public sealed class AuthService : IAuthService
             cancellationToken);
 
         return await IssueTokenPairAsync(user, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<UserListItemDto>> GetUsersAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        return await _users.GetAllByCompanyIdAsync(companyId, cancellationToken);
     }
 
     public async Task LogoutAsync(LogoutRequest request, CancellationToken cancellationToken)

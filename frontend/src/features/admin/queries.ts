@@ -15,6 +15,8 @@ import {
   getAllStatuses,
   createStatus,
   updateStatus,
+  getAllUsers,
+  createUser,
 } from './api'
 import type { TicketDto, UpdateTicketRequest } from '../tickets/types'
 import type {
@@ -24,6 +26,7 @@ import type {
   UpdatePriorityRequest,
   CreateStatusRequest,
   UpdateStatusRequest,
+  CreateUserRequest,
 } from './types'
 
 export function useAdminTickets() {
@@ -147,6 +150,20 @@ export function useUpdateStatus() {
       updateStatus(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'statuses'] })
+    },
+  })
+}
+
+export function useAdminUsers() {
+  return useQuery({ queryKey: ['admin', 'users'], queryFn: getAllUsers })
+}
+
+export function useCreateUser() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CreateUserRequest) => createUser(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
     },
   })
 }
