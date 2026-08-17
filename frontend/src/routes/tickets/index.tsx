@@ -154,8 +154,8 @@ function CreateTicketPage() {
 
   return (
     <AppShell>
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">Nuevo ticket</h1>
-      <Card className="max-w-2xl">
+      <h1 className="mb-6 text-center text-2xl font-bold text-gray-900">Nuevo ticket</h1>
+      <Card className="mx-auto max-w-2xl">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <Input
             label="Título"
