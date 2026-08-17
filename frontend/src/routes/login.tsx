@@ -2,7 +2,6 @@ import {
   createFileRoute,
   Link,
   Navigate,
-  useNavigate,
 } from '@tanstack/react-router'
 import { useState, type FormEvent } from 'react'
 import { Button } from '../components/common/Button'
@@ -14,8 +13,7 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
-  const navigate = useNavigate()
-  const { login, isAuthenticated, isPending } = useAuth()
+  const { login, isAuthenticated, isPending, user } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -25,13 +23,18 @@ function LoginPage() {
     setError(null)
     try {
       await login(email, password)
-      await navigate({ to: '/tickets' })
     } catch {
       setError('Credenciales inválidas.')
     }
   }
 
   if (isAuthenticated) {
+    if (user?.role === 'Administrador') {
+      return <Navigate to="/admin" />
+    }
+    if (user?.role === 'Tecnico') {
+      return <Navigate to="/technician" />
+    }
     return <Navigate to="/tickets" />
   }
 

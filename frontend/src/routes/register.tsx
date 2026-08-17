@@ -2,7 +2,6 @@ import {
   createFileRoute,
   Link,
   Navigate,
-  useNavigate,
 } from '@tanstack/react-router'
 import { useState, type FormEvent } from 'react'
 import { Button } from '../components/common/Button'
@@ -15,7 +14,6 @@ export const Route = createFileRoute('/register')({
 })
 
 function RegisterPage() {
-  const navigate = useNavigate()
   const { register, isAuthenticated, isPending } = useAuth()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -36,7 +34,6 @@ function RegisterPage() {
     }
     try {
       await register(request)
-      await navigate({ to: '/tickets' })
     } catch {
       setError('No se pudo completar el registro.')
     }
