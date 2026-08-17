@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -13,6 +13,12 @@ const navItems: NavItem[] = [
 
 export function TechnicianAppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    await logout()
+    await navigate({ to: '/login' })
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -39,7 +45,7 @@ export function TechnicianAppShell({ children }: { children: ReactNode }) {
             </span>
             <button
               type="button"
-              onClick={() => void logout()}
+              onClick={() => void handleLogout()}
               className="text-sm text-blue-100 hover:text-white"
             >
               Cerrar sesión
