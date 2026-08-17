@@ -1,7 +1,9 @@
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Catalog;
 using ServiceDesk.Application.Features.Catalog;
+using ServiceDesk.Application.Features.Catalog.Validators;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Infrastructure.Persistence;
 using ServiceDesk.Infrastructure.Persistence.Repositories;
@@ -196,7 +198,16 @@ public sealed class CatalogServiceTests
     }
 
     private static CatalogService CreateService(ServiceDeskDbContext context) =>
-        new(new CatalogRepository(context), new FakeCurrentUserService(Guid.NewGuid(), CompanyId));
+        new(
+            new CatalogRepository(context),
+            new FakeCurrentUserService(Guid.NewGuid(), CompanyId),
+            context,
+            new CreateCategoryRequestValidator(),
+            new UpdateCategoryRequestValidator(),
+            new CreatePriorityRequestValidator(),
+            new UpdatePriorityRequestValidator(),
+            new CreateStatusRequestValidator(),
+            new UpdateStatusRequestValidator());
 
     private static Category CreateCategory(Guid companyId, string name, bool isActive = true) =>
         new() { Id = Guid.NewGuid(), CompanyId = companyId, Name = name, IsActive = isActive };

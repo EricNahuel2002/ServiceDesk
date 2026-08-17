@@ -11,6 +11,12 @@ public interface ICatalogRepository
 
     Task<IReadOnlyList<StatusDto>> GetActiveStatusesAsync(Guid companyId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<CategoryDto>> GetAllCategoriesAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<PriorityDto>> GetAllPrioritiesAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<StatusDto>> GetAllStatusesAsync(Guid companyId, CancellationToken cancellationToken = default);
+
     Task<Category?> GetCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<Priority?> GetPriorityByIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -22,4 +28,16 @@ public interface ICatalogRepository
     Task<Guid?> FindFirstClosedStatusIdAsync(Guid companyId, CancellationToken cancellationToken = default);
 
     Task<Guid?> FindDefaultPriorityIdAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    Task AddCategoryAsync(Category category, CancellationToken cancellationToken = default);
+
+    Task AddPriorityAsync(Priority priority, CancellationToken cancellationToken = default);
+
+    Task AddStatusAsync(Status status, CancellationToken cancellationToken = default);
+
+    Task<bool> CategoryNameExistsAsync(Guid companyId, string name, Guid? excludeId = null, CancellationToken cancellationToken = default);
+
+    Task<bool> PriorityNameExistsAsync(Guid companyId, string name, Guid? excludeId = null, CancellationToken cancellationToken = default);
+
+    Task<bool> StatusNameExistsAsync(Guid companyId, string name, Guid? excludeId = null, CancellationToken cancellationToken = default);
 }

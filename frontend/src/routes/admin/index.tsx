@@ -183,13 +183,19 @@ function AdminDashboardPage() {
                     Ver detalle
                   </Link>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge color={getStatusBadgeColor(ticket.statusName)}>
-                    {ticket.statusName}
-                  </Badge>
-                  <Badge color={getPriorityBadgeColor(ticket.priorityName)}>
-                    {ticket.priorityName}
-                  </Badge>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-gray-500">Estado:</span>
+                    <Badge color={getStatusBadgeColor(ticket.statusName)}>
+                      {ticket.statusName}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-gray-500">Prioridad:</span>
+                    <Badge color={getPriorityBadgeColor(ticket.priorityName)}>
+                      {ticket.priorityName}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <div className="flex flex-col gap-1">

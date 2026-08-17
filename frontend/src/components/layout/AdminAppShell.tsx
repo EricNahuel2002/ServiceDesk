@@ -3,11 +3,14 @@ import type { ReactNode } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
 interface NavItem {
-  to: '/admin'
+  to: '/admin' | '/admin/catalogs'
   label: string
 }
 
-const navItems: NavItem[] = [{ to: '/admin', label: 'Dashboard' }]
+const navItems: NavItem[] = [
+  { to: '/admin', label: 'Dashboard' },
+  { to: '/admin/catalogs', label: 'Catálogos' },
+]
 
 export function AdminAppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth()

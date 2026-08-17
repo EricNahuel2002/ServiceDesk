@@ -102,4 +102,79 @@ public sealed class CatalogRepository : ICatalogRepository
             .Where(priority => priority.CompanyId == companyId && priority.Name == "Media" && priority.IsActive)
             .Select(priority => (Guid?)priority.Id)
             .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<CategoryDto>> GetAllCategoriesAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Categories
+            .AsNoTracking()
+            .Where(category => category.CompanyId == companyId)
+            .OrderBy(category => category.Name)
+            .Select(CategoryProjection)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PriorityDto>> GetAllPrioritiesAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Priorities
+            .AsNoTracking()
+            .Where(priority => priority.CompanyId == companyId)
+            .OrderBy(priority => priority.SortOrder)
+            .Select(PriorityProjection)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<StatusDto>> GetAllStatusesAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Statuses
+            .AsNoTracking()
+            .Where(status => status.CompanyId == companyId)
+            .OrderBy(status => status.SortOrder)
+            .Select(StatusProjection)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddCategoryAsync(Category category, CancellationToken cancellationToken = default)
+    {
+        await _context.Categories.AddAsync(category, cancellationToken);
+    }
+
+    public async Task AddPriorityAsync(Priority priority, CancellationToken cancellationToken = default)
+    {
+        await _context.Priorities.AddAsync(priority, cancellationToken);
+    }
+
+    public async Task AddStatusAsync(Status status, CancellationToken cancellationToken = default)
+    {
+        await _context.Statuses.AddAsync(status, cancellationToken);
+    }
+
+    public async Task<bool> CategoryNameExistsAsync(
+        Guid companyId,
+        string name,
+        Guid? excludeId = null,
+        CancellationToken cancellationToken = default) =>
+        await _context.Categories
+            .AnyAsync(
+                c => c.CompanyId == companyId && c.Name == name && (excludeId == null || c.Id != excludeId.Value),
+                cancellationToken);
+
+    public async Task<bool> PriorityNameExistsAsync(
+        Guid companyId,
+        string name,
+        Guid? excludeId = null,
+        CancellationToken cancellationToken = default) =>
+        await _context.Priorities
+            .AnyAsync(
+                p => p.CompanyId == companyId && p.Name == name && (excludeId == null || p.Id != excludeId.Value),
+                cancellationToken);
+
+    public async Task<bool> StatusNameExistsAsync(
+        Guid companyId,
+        string name,
+        Guid? excludeId = null,
+        CancellationToken cancellationToken = default) =>
+        await _context.Statuses
+            .AnyAsync(
+                s => s.CompanyId == companyId && s.Name == name && (excludeId == null || s.Id != excludeId.Value),
+                cancellationToken);
 }
