@@ -4,7 +4,7 @@ import { Card } from '../../../components/common/Card'
 import { Badge } from '../../../components/common/Badge'
 import { Button } from '../../../components/common/Button'
 import { TechnicianAppShell } from '../../../components/layout/TechnicianAppShell'
-import { ChatPanel } from '../../../components/chat/ChatPanel'
+import { useOpenChat } from '../../../features/chat/ChatWidgetContext'
 import { useTechnicianTicket, useResolveTicket, useIsTechnicianTicketClosed } from '../../../features/technician/queries'
 import { requireTecnico } from '../../../features/technician/auth'
 import { formatDate } from '../../../utils/format'
@@ -44,6 +44,7 @@ function TechnicianTicketDetailPage() {
   const ticket = useTechnicianTicket(ticketId)
   const resolveTicket = useResolveTicket()
   const { isClosed } = useIsTechnicianTicketClosed()
+  const openChat = useOpenChat()
 
   const [showResolveForm, setShowResolveForm] = useState(false)
   const [resolutionNote, setResolutionNote] = useState('')
@@ -152,8 +153,15 @@ function TechnicianTicketDetailPage() {
 
         {!isClosed(t) && (
           <Card>
-            <h3 className="mb-3 text-sm font-semibold text-gray-900">Chat con el cliente</h3>
-            <ChatPanel ticketId={ticketId} />
+            <div className="flex flex-col gap-3">
+              <h3 className="text-sm font-semibold text-gray-900">Chat con el cliente</h3>
+              <p className="text-sm text-gray-500">Abrí el chat para comunicarte con el cliente.</p>
+              <div>
+                <Button onClick={() => openChat(ticketId)}>
+                  Abrir chat
+                </Button>
+              </div>
+            </div>
           </Card>
         )}
 

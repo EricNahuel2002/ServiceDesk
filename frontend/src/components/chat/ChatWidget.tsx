@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useChatWidget } from '../../features/chat/useChatWidget'
+import { useRegisterOpenChat } from '../../features/chat/ChatWidgetContext'
 import { ChatWidgetTicketList } from './ChatWidgetTicketList'
 import { ChatWidgetPanel } from './ChatWidgetPanel'
 import { ChatIcon } from '../common/ChatIcon'
@@ -16,6 +17,7 @@ interface ChatWidgetProps {
 
 export function ChatWidget({ tickets }: ChatWidgetProps) {
   const { isAuthenticated } = useAuth()
+  const registerOpenChat = useRegisterOpenChat()
   const [isOpen, setIsOpen] = useState(false)
   const {
     unreadCounts,
@@ -25,6 +27,15 @@ export function ChatWidget({ tickets }: ChatWidgetProps) {
     openChat,
     closeChat,
   } = useChatWidget(tickets)
+
+  const openChatForTicket = useCallback((ticketId: string) => {
+    setIsOpen(true)
+    openChat(ticketId)
+  }, [openChat])
+
+  useEffect(() => {
+    return registerOpenChat(openChatForTicket)
+  }, [registerOpenChat, openChatForTicket])
 
   if (!isAuthenticated || tickets.length === 0) return null
 

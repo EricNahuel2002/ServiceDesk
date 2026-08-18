@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import { AuthProvider } from '../features/auth/AuthProvider'
 import { ChatWidget } from '../components/chat/ChatWidget'
+import { ChatWidgetContextProvider } from '../features/chat/ChatWidgetContext'
 import { useAuth } from '../hooks/useAuth'
 import { getMyTickets } from '../features/tickets/api'
 import { getAssignedTickets } from '../features/technician/api'
@@ -19,8 +20,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function RootComponent() {
   return (
     <AuthProvider>
-      <ChatWidgetWrapper />
-      <Outlet />
+      <ChatWidgetContextProvider>
+        <ChatWidgetWrapper />
+        <Outlet />
+      </ChatWidgetContextProvider>
       {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
     </AuthProvider>
   )

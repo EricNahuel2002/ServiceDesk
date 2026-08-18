@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessageBubble } from './ChatMessageBubble'
 import { ChatTypingIndicator } from './ChatTypingIndicator'
 import { useChat } from '../../features/chat/useChat'
@@ -14,6 +15,7 @@ interface ChatWidgetPanelProps {
 export function ChatWidgetPanel({ ticketId, ticketTitle, onBack }: ChatWidgetPanelProps) {
   const { messages: realtimeMessages, typingUsers, sendMessage, sendTyping, currentUserId } = useChat(ticketId)
   const history = useChatHistory(ticketId)
+  const queryClient = useQueryClient()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -60,6 +62,7 @@ export function ChatWidgetPanel({ ticketId, ticketTitle, onBack }: ChatWidgetPan
       typingTimeoutRef.current = null
     }
     await sendMessage(trimmed)
+    queryClient.invalidateQueries({ queryKey: ['chat', ticketId] })
   }
 
   return (

@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Card } from '../../components/common/Card'
 import { Badge } from '../../components/common/Badge'
+import { Button } from '../../components/common/Button'
 import { AppShell } from '../../components/layout/AppShell'
-import { ChatPanel } from '../../components/chat/ChatPanel'
+import { useOpenChat } from '../../features/chat/ChatWidgetContext'
 import { useTickets, useIsTicketClosed } from '../../features/tickets/queries'
 import { requireCliente } from '../../features/tickets/auth'
 import { formatDate } from '../../utils/format'
@@ -40,6 +41,7 @@ function ClientTicketDetailPage() {
   const { ticketId } = Route.useParams()
   const tickets = useTickets()
   const { isClosed } = useIsTicketClosed()
+  const openChat = useOpenChat()
 
   if (tickets.isPending) {
     return <AppShell><p className="text-gray-500">Cargando...</p></AppShell>
@@ -140,8 +142,15 @@ function ClientTicketDetailPage() {
 
             {!isClosed(ticket) && ticket.assignedToId && (
               <Card>
-                <h3 className="mb-3 text-sm font-semibold text-gray-900">Chat con el técnico</h3>
-                <ChatPanel ticketId={ticketId} />
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Chat con el técnico</h3>
+                  <p className="text-sm text-gray-500">Abrí el chat para comunicarte con el técnico asignado.</p>
+                  <div>
+                    <Button onClick={() => openChat(ticketId)}>
+                      Abrir chat
+                    </Button>
+                  </div>
+                </div>
               </Card>
             )}
           </div>
