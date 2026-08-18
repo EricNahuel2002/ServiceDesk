@@ -15,14 +15,6 @@ public sealed class CatalogRepository : ICatalogRepository
         IsActive = category.IsActive
     };
 
-    private static readonly Expression<Func<Priority, PriorityDto>> PriorityProjection = priority => new PriorityDto
-    {
-        Id = priority.Id,
-        Name = priority.Name,
-        SortOrder = priority.SortOrder,
-        IsActive = priority.IsActive
-    };
-
     private static readonly Expression<Func<Status, StatusDto>> StatusProjection = status => new StatusDto
     {
         Id = status.Id,
@@ -49,16 +41,6 @@ public sealed class CatalogRepository : ICatalogRepository
             .Select(CategoryProjection)
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<PriorityDto>> GetActivePrioritiesAsync(
-        Guid companyId,
-        CancellationToken cancellationToken = default) =>
-        await _context.Priorities
-            .AsNoTracking()
-            .Where(priority => priority.CompanyId == companyId && priority.IsActive)
-            .OrderBy(priority => priority.SortOrder)
-            .Select(PriorityProjection)
-            .ToListAsync(cancellationToken);
-
     public async Task<IReadOnlyList<StatusDto>> GetActiveStatusesAsync(
         Guid companyId,
         CancellationToken cancellationToken = default) =>
@@ -71,11 +53,6 @@ public sealed class CatalogRepository : ICatalogRepository
 
     public async Task<Category?> GetCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await _context.Categories
-            .AsNoTracking()
-            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-
-    public async Task<Priority?> GetPriorityByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-        await _context.Priorities
             .AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
 
@@ -97,12 +74,6 @@ public sealed class CatalogRepository : ICatalogRepository
             .Select(status => (Guid?)status.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-    public async Task<Guid?> FindDefaultPriorityIdAsync(Guid companyId, CancellationToken cancellationToken = default) =>
-        await _context.Priorities
-            .Where(priority => priority.CompanyId == companyId && priority.Name == "Media" && priority.IsActive)
-            .Select(priority => (Guid?)priority.Id)
-            .SingleOrDefaultAsync(cancellationToken);
-
     public async Task<IReadOnlyList<CategoryDto>> GetAllCategoriesAsync(
         Guid companyId,
         CancellationToken cancellationToken = default) =>
@@ -111,16 +82,6 @@ public sealed class CatalogRepository : ICatalogRepository
             .Where(category => category.CompanyId == companyId)
             .OrderBy(category => category.Name)
             .Select(CategoryProjection)
-            .ToListAsync(cancellationToken);
-
-    public async Task<IReadOnlyList<PriorityDto>> GetAllPrioritiesAsync(
-        Guid companyId,
-        CancellationToken cancellationToken = default) =>
-        await _context.Priorities
-            .AsNoTracking()
-            .Where(priority => priority.CompanyId == companyId)
-            .OrderBy(priority => priority.SortOrder)
-            .Select(PriorityProjection)
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<StatusDto>> GetAllStatusesAsync(
@@ -138,11 +99,6 @@ public sealed class CatalogRepository : ICatalogRepository
         await _context.Categories.AddAsync(category, cancellationToken);
     }
 
-    public async Task AddPriorityAsync(Priority priority, CancellationToken cancellationToken = default)
-    {
-        await _context.Priorities.AddAsync(priority, cancellationToken);
-    }
-
     public async Task AddStatusAsync(Status status, CancellationToken cancellationToken = default)
     {
         await _context.Statuses.AddAsync(status, cancellationToken);
@@ -156,16 +112,6 @@ public sealed class CatalogRepository : ICatalogRepository
         await _context.Categories
             .AnyAsync(
                 c => c.CompanyId == companyId && c.Name == name && (excludeId == null || c.Id != excludeId.Value),
-                cancellationToken);
-
-    public async Task<bool> PriorityNameExistsAsync(
-        Guid companyId,
-        string name,
-        Guid? excludeId = null,
-        CancellationToken cancellationToken = default) =>
-        await _context.Priorities
-            .AnyAsync(
-                p => p.CompanyId == companyId && p.Name == name && (excludeId == null || p.Id != excludeId.Value),
                 cancellationToken);
 
     public async Task<bool> StatusNameExistsAsync(

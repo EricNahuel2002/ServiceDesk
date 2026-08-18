@@ -17,8 +17,7 @@ public sealed class TicketRepository : ITicketRepository
         CompanyId = ticket.CompanyId,
         CategoryId = ticket.CategoryId,
         CategoryName = ticket.Category!.Name,
-        PriorityId = ticket.PriorityId,
-        PriorityName = ticket.Priority!.Name,
+        Priority = ticket.Priority,
         StatusId = ticket.StatusId,
         StatusName = ticket.Status!.Name,
         CreatedById = ticket.CreatedById,
@@ -28,6 +27,8 @@ public sealed class TicketRepository : ITicketRepository
         AssignedToEmail = ticket.AssignedTo!.Email,
         CreatedAtUtc = ticket.CreatedAtUtc,
         UpdatedAtUtc = ticket.UpdatedAtUtc,
+        ResponseDeadlineAtUtc = ticket.ResponseDeadlineAtUtc,
+        StartedWorkAtUtc = ticket.StartedWorkAtUtc,
         Attachments = ticket.Attachments
             .Select(attachment => new TicketAttachmentDto
             {
@@ -107,7 +108,7 @@ public sealed class TicketRepository : ITicketRepository
                 TicketId = ticket.Id,
                 Title = ticket.Title,
                 Description = ticket.Description,
-                PriorityName = ticket.Priority!.Name,
+                PriorityName = ticket.Priority.ToString(),
                 AssignedToFirstName = ticket.AssignedTo!.FirstName,
                 AssignedToLastName = ticket.AssignedTo!.LastName,
                 AssignedToEmail = ticket.AssignedTo!.Email ?? string.Empty,

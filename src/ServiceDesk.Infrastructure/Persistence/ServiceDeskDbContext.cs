@@ -8,6 +8,7 @@ using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Common;
 using ServiceDesk.Domain.Companies;
 using ServiceDesk.Domain.Identity;
+using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Infrastructure.Persistence;
@@ -29,8 +30,6 @@ public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     public DbSet<Category> Categories => Set<Category>();
 
-    public DbSet<Priority> Priorities => Set<Priority>();
-
     public DbSet<Status> Statuses => Set<Status>();
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -38,6 +37,10 @@ public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+
+    public DbSet<SlaConfiguration> SlaConfigurations => Set<SlaConfiguration>();
+
+    public DbSet<CompanyBusinessHours> CompanyBusinessHours => Set<CompanyBusinessHours>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
