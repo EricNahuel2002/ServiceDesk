@@ -4,10 +4,13 @@ using ServiceDesk.Application.Common.Exceptions;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.Common.Validation;
 using ServiceDesk.Application.DTOs.Notifications;
+using ServiceDesk.Application.DTOs.Catalog;
 using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Common;
+using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
+using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
 using ValidationException = ServiceDesk.Application.Common.Exceptions.ValidationException;
 
@@ -17,11 +20,13 @@ public sealed class TicketService : ITicketService
 {
     private readonly ITicketRepository _tickets;
     private readonly ICatalogRepository _catalog;
+    private readonly ISlaRepository _slaRepository;
     private readonly IUserRepository _users;
     private readonly IIdentityService _identity;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
     private readonly ICatalogVerificationService _catalogVerification;
+    private readonly IBusinessHoursCalculator _businessHoursCalculator;
     private readonly IValidator<CreateTicketRequest> _validator;
     private readonly IValidator<UpdateTicketRequest> _updateValidator;
     private readonly IValidator<ResolveTicketRequest> _resolveValidator;
@@ -31,11 +36,13 @@ public sealed class TicketService : ITicketService
     public TicketService(
         ITicketRepository tickets,
         ICatalogRepository catalog,
+        ISlaRepository slaRepository,
         IUserRepository users,
         IIdentityService identity,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUser,
         ICatalogVerificationService catalogVerification,
+        IBusinessHoursCalculator businessHoursCalculator,
         IValidator<CreateTicketRequest> validator,
         IValidator<UpdateTicketRequest> updateValidator,
         IValidator<ResolveTicketRequest> resolveValidator,
@@ -44,11 +51,13 @@ public sealed class TicketService : ITicketService
     {
         _tickets = tickets;
         _catalog = catalog;
+        _slaRepository = slaRepository;
         _users = users;
         _identity = identity;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _catalogVerification = catalogVerification;
+        _businessHoursCalculator = businessHoursCalculator;
         _validator = validator;
         _updateValidator = updateValidator;
         _resolveValidator = resolveValidator;
@@ -66,7 +75,8 @@ public sealed class TicketService : ITicketService
         await _catalogVerification.EnsureCategoryBelongsToCompanyAsync(request.CategoryId, cancellationToken);
 
         Guid statusId = await FindInitialStatusIdAsync(companyId, cancellationToken);
-        Guid priorityId = await FindDefaultPriorityIdAsync(companyId, cancellationToken);
+        TicketPriority priority = TicketPriority.Media;
+        DateTime responseDeadline = await CalculateResponseDeadlineAsync(companyId, priority, DateTime.UtcNow, cancellationToken);
 
         Ticket ticket = new()
         {
@@ -75,9 +85,10 @@ public sealed class TicketService : ITicketService
             Description = request.Description.Trim(),
             CompanyId = companyId,
             CategoryId = request.CategoryId,
-            PriorityId = priorityId,
+            Priority = priority,
             StatusId = statusId,
-            CreatedById = userId
+            CreatedById = userId,
+            ResponseDeadlineAtUtc = responseDeadline
         };
 
         List<TicketAttachment> attachments = new(request.Files.Count);
@@ -146,6 +157,57 @@ public sealed class TicketService : ITicketService
         TicketDto? ticket = await _tickets.GetDtoByIdAsync(id, _currentUser.CompanyId, cancellationToken);
 
         return ticket ?? throw new NotFoundException($"El ticket con id {id} no existe.");
+    }
+
+    public async Task<TicketDto> StartWorkAsync(Guid id, CancellationToken cancellationToken)
+    {
+        Ticket? ticket = await _tickets.GetAssignedTicketByIdAsync(
+            id,
+            _currentUser.CompanyId,
+            _currentUser.UserId,
+            cancellationToken);
+
+        if (ticket is null)
+        {
+            throw new NotFoundException($"El ticket con id {id} no existe o no está asignado a ti.");
+        }
+
+        ApplicationUser? technician = await _users.GetByIdAsync(_currentUser.UserId, cancellationToken);
+
+        if (technician is null || !technician.IsActive)
+        {
+            throw new NotFoundException("El técnico actual no existe o está inactivo.");
+        }
+
+        if (!technician.IsInRole(Roles.Tecnico))
+        {
+            throw new DomainRuleViolationException("Solo un usuario con el rol de técnico puede iniciar trabajo en un ticket.");
+        }
+
+        if (ticket.StartedWorkAtUtc is not null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Ticket"] = ["El trabajo en este ticket ya fue iniciado."]
+            });
+        }
+
+        Guid? enProgresoStatusId = await FindStatusByNameAsync(ticket.CompanyId, "En Progreso", cancellationToken);
+
+        if (enProgresoStatusId is null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["StatusId"] = ["No se encontró el estado 'En Progreso' para tu empresa."]
+            });
+        }
+
+        ticket.StartedWorkAtUtc = DateTime.UtcNow;
+        ticket.StatusId = enProgresoStatusId.Value;
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
     public async Task<TicketDto> ResolveAsync(
@@ -233,13 +295,23 @@ public sealed class TicketService : ITicketService
 
         bool wasReassigned = ticket.AssignedToId != request.AssignedToId;
 
-        await _catalogVerification.EnsurePriorityBelongsToCompanyAsync(request.PriorityId, cancellationToken);
         Status status = await _catalogVerification.EnsureStatusBelongsToCompanyAsync(request.StatusId, cancellationToken);
 
+        bool priorityChanged = ticket.Priority != request.Priority;
+
         ticket.AssignedToId = request.AssignedToId;
-        ticket.PriorityId = request.PriorityId;
+        ticket.Priority = request.Priority;
         ticket.StatusId = request.StatusId;
         ticket.ResolvedAtUtc = status.IsClosed ? DateTime.UtcNow : null;
+
+        if (priorityChanged)
+        {
+            ticket.ResponseDeadlineAtUtc = await CalculateResponseDeadlineAsync(
+                _currentUser.CompanyId,
+                request.Priority,
+                ticket.CreatedAtUtc,
+                cancellationToken);
+        }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -309,6 +381,37 @@ public sealed class TicketService : ITicketService
         return technician;
     }
 
+    private async Task<DateTime> CalculateResponseDeadlineAsync(
+        Guid companyId,
+        TicketPriority priority,
+        DateTime createdAtUtc,
+        CancellationToken cancellationToken)
+    {
+        SlaConfiguration? slaConfig = await _slaRepository.FindByCompanyAndPriorityAsync(
+            companyId,
+            priority,
+            cancellationToken);
+
+        if (slaConfig is null)
+        {
+            return createdAtUtc.AddHours(4);
+        }
+
+        CompanyBusinessHours? businessHours = await _slaRepository.GetBusinessHoursAsync(
+            companyId,
+            cancellationToken);
+
+        if (businessHours is null || !businessHours.UseBusinessHours)
+        {
+            return createdAtUtc.AddHours(slaConfig.ResponseTimeHours);
+        }
+
+        return _businessHoursCalculator.AddBusinessHours(
+            createdAtUtc,
+            slaConfig.ResponseTimeHours,
+            businessHours);
+    }
+
     private async Task EnqueueAssignedNotificationAsync(
         Ticket ticket,
         CancellationToken cancellationToken)
@@ -354,19 +457,11 @@ public sealed class TicketService : ITicketService
         return statusId.Value;
     }
 
-    private async Task<Guid> FindDefaultPriorityIdAsync(Guid companyId, CancellationToken cancellationToken)
+    private async Task<Guid?> FindStatusByNameAsync(Guid companyId, string name, CancellationToken cancellationToken)
     {
-        Guid? priorityId = await _catalog.FindDefaultPriorityIdAsync(companyId, cancellationToken);
-
-        if (priorityId is null)
-        {
-            throw new ValidationException(new Dictionary<string, string[]>
-            {
-                ["PriorityId"] = ["No se encontró la prioridad por defecto 'Media' para tu empresa."]
-            });
-        }
-
-        return priorityId.Value;
+        IReadOnlyList<StatusDto> statuses = await _catalog.GetAllStatusesAsync(companyId, cancellationToken);
+        StatusDto? status = statuses.FirstOrDefault(s => s.Name == name);
+        return status?.Id;
     }
 
     private static string BuildBlobName(Guid companyId, Guid ticketId, Guid attachmentId) =>

@@ -21,6 +21,8 @@ public interface ITicketService
         ResolveTicketRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<TicketDto> StartWorkAsync(Guid id, CancellationToken cancellationToken = default);
+
     Task<TicketDto> UpdateAsync(
         Guid id,
         UpdateTicketRequest request,

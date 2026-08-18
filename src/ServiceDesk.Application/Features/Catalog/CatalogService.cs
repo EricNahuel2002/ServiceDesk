@@ -15,8 +15,6 @@ public sealed class CatalogService : ICatalogService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IValidator<CreateCategoryRequest> _createCategoryValidator;
     private readonly IValidator<UpdateCategoryRequest> _updateCategoryValidator;
-    private readonly IValidator<CreatePriorityRequest> _createPriorityValidator;
-    private readonly IValidator<UpdatePriorityRequest> _updatePriorityValidator;
     private readonly IValidator<CreateStatusRequest> _createStatusValidator;
     private readonly IValidator<UpdateStatusRequest> _updateStatusValidator;
 
@@ -26,8 +24,6 @@ public sealed class CatalogService : ICatalogService
         IUnitOfWork unitOfWork,
         IValidator<CreateCategoryRequest> createCategoryValidator,
         IValidator<UpdateCategoryRequest> updateCategoryValidator,
-        IValidator<CreatePriorityRequest> createPriorityValidator,
-        IValidator<UpdatePriorityRequest> updatePriorityValidator,
         IValidator<CreateStatusRequest> createStatusValidator,
         IValidator<UpdateStatusRequest> updateStatusValidator)
     {
@@ -36,8 +32,6 @@ public sealed class CatalogService : ICatalogService
         _unitOfWork = unitOfWork;
         _createCategoryValidator = createCategoryValidator;
         _updateCategoryValidator = updateCategoryValidator;
-        _createPriorityValidator = createPriorityValidator;
-        _updatePriorityValidator = updatePriorityValidator;
         _createStatusValidator = createStatusValidator;
         _updateStatusValidator = updateStatusValidator;
     }
@@ -45,17 +39,11 @@ public sealed class CatalogService : ICatalogService
     public Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken) =>
         _catalog.GetActiveCategoriesAsync(_currentUser.CompanyId, cancellationToken);
 
-    public Task<IReadOnlyList<PriorityDto>> GetPrioritiesAsync(CancellationToken cancellationToken) =>
-        _catalog.GetActivePrioritiesAsync(_currentUser.CompanyId, cancellationToken);
-
     public Task<IReadOnlyList<StatusDto>> GetStatusesAsync(CancellationToken cancellationToken) =>
         _catalog.GetActiveStatusesAsync(_currentUser.CompanyId, cancellationToken);
 
     public Task<IReadOnlyList<CategoryDto>> GetAllCategoriesAsync(CancellationToken cancellationToken) =>
         _catalog.GetAllCategoriesAsync(_currentUser.CompanyId, cancellationToken);
-
-    public Task<IReadOnlyList<PriorityDto>> GetAllPrioritiesAsync(CancellationToken cancellationToken) =>
-        _catalog.GetAllPrioritiesAsync(_currentUser.CompanyId, cancellationToken);
 
     public Task<IReadOnlyList<StatusDto>> GetAllStatusesAsync(CancellationToken cancellationToken) =>
         _catalog.GetAllStatusesAsync(_currentUser.CompanyId, cancellationToken);
@@ -109,59 +97,6 @@ public sealed class CatalogService : ICatalogService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new CategoryDto { Id = category.Id, Name = category.Name, IsActive = category.IsActive };
-    }
-
-    public async Task<PriorityDto> CreatePriorityAsync(CreatePriorityRequest request, CancellationToken cancellationToken)
-    {
-        await ValidationHelper.ValidateAsync(_createPriorityValidator, request, cancellationToken);
-
-        if (await _catalog.PriorityNameExistsAsync(_currentUser.CompanyId, request.Name, cancellationToken: cancellationToken))
-        {
-            throw new ValidationException(new Dictionary<string, string[]>
-            {
-                { "Name", ["Ya existe una prioridad con ese nombre."] }
-            });
-        }
-
-        Priority priority = new()
-        {
-            CompanyId = _currentUser.CompanyId,
-            Name = request.Name,
-            SortOrder = request.SortOrder
-        };
-
-        await _catalog.AddPriorityAsync(priority, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return new PriorityDto { Id = priority.Id, Name = priority.Name, SortOrder = priority.SortOrder, IsActive = priority.IsActive };
-    }
-
-    public async Task<PriorityDto> UpdatePriorityAsync(Guid id, UpdatePriorityRequest request, CancellationToken cancellationToken)
-    {
-        await ValidationHelper.ValidateAsync(_updatePriorityValidator, request, cancellationToken);
-
-        Priority? priority = await _catalog.GetPriorityByIdAsync(id, cancellationToken);
-
-        if (priority is null)
-        {
-            throw new NotFoundException($"La prioridad con id {id} no existe.");
-        }
-
-        if (await _catalog.PriorityNameExistsAsync(_currentUser.CompanyId, request.Name, id, cancellationToken))
-        {
-            throw new ValidationException(new Dictionary<string, string[]>
-            {
-                { "Name", ["Ya existe una prioridad con ese nombre."] }
-            });
-        }
-
-        priority.Name = request.Name;
-        priority.SortOrder = request.SortOrder;
-        priority.IsActive = request.IsActive;
-
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return new PriorityDto { Id = priority.Id, Name = priority.Name, SortOrder = priority.SortOrder, IsActive = priority.IsActive };
     }
 
     public async Task<StatusDto> CreateStatusAsync(CreateStatusRequest request, CancellationToken cancellationToken)

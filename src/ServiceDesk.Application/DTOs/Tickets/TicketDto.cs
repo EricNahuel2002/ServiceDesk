@@ -1,3 +1,5 @@
+using ServiceDesk.Domain.Enums;
+
 namespace ServiceDesk.Application.DTOs.Tickets;
 
 public sealed record TicketDto
@@ -14,9 +16,7 @@ public sealed record TicketDto
 
     public string CategoryName { get; init; } = string.Empty;
 
-    public Guid PriorityId { get; init; }
-
-    public string PriorityName { get; init; } = string.Empty;
+    public TicketPriority Priority { get; init; }
 
     public Guid StatusId { get; init; }
 
@@ -35,6 +35,16 @@ public sealed record TicketDto
     public DateTime CreatedAtUtc { get; init; }
 
     public DateTime? UpdatedAtUtc { get; init; }
+
+    public DateTime ResponseDeadlineAtUtc { get; init; }
+
+    public DateTime? StartedWorkAtUtc { get; init; }
+
+    public int SlaLimitHours { get; init; }
+
+    public decimal SlaPercentageElapsed { get; init; }
+
+    public bool IsOverdue { get; init; }
 
     public IReadOnlyList<TicketAttachmentDto> Attachments { get; init; } = [];
 }

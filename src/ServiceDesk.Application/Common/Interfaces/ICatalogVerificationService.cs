@@ -6,7 +6,5 @@ public interface ICatalogVerificationService
 {
     Task EnsureCategoryBelongsToCompanyAsync(Guid categoryId, CancellationToken cancellationToken = default);
 
-    Task EnsurePriorityBelongsToCompanyAsync(Guid priorityId, CancellationToken cancellationToken = default);
-
     Task<Status> EnsureStatusBelongsToCompanyAsync(Guid statusId, CancellationToken cancellationToken = default);
 }
