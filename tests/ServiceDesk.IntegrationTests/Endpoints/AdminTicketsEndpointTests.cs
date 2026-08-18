@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
 using ServiceDesk.Application.DTOs.Tickets;
+using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
 
 namespace ServiceDesk.IntegrationTests.Endpoints;
@@ -198,22 +199,20 @@ public sealed class AdminTicketsEndpointTests
         await _factory.ResetTicketsAsync();
         (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
         Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket D", "Para actualizar");
-        Guid altaId = await _factory.GetPriorityIdAsync(companyId, "Alta");
         Guid enProgresoId = await _factory.GetStatusIdAsync(companyId, "En Progreso");
 
         using HttpClient client = await _factory.CreateClientForRoleAsync(Roles.Administrador);
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = technicianId, PriorityId = altaId, StatusId = enProgresoId });
+            new { AssignedToId = technicianId, Priority = TicketPriority.Alta, StatusId = enProgresoId });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         TicketDto? ticket = await response.Content.ReadFromJsonAsync<TicketDto>();
         Assert.NotNull(ticket);
         Assert.Equal(technicianId, ticket.AssignedToId);
-        Assert.Equal(altaId, ticket.PriorityId);
+        Assert.Equal(TicketPriority.Alta, ticket.Priority);
         Assert.Equal(enProgresoId, ticket.StatusId);
-        Assert.Equal("Alta", ticket.PriorityName);
         Assert.Equal("En Progreso", ticket.StatusName);
     }
 
@@ -229,12 +228,7 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new
-            {
-                AssignedToId = technicianId,
-                PriorityId = (await GetSeedCompanyCatalogAsync()).PriorityId,
-                StatusId = resueltoId
-            });
+            new { AssignedToId = technicianId, Priority = TicketPriority.Media, StatusId = resueltoId });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.NotNull(await _factory.GetResolvedAtUtcAsync(ticketId));
@@ -253,11 +247,11 @@ public sealed class AdminTicketsEndpointTests
 
         await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = technicianId, PriorityId = (await GetSeedCompanyCatalogAsync()).PriorityId, StatusId = resueltoId });
+            new { AssignedToId = technicianId, Priority = TicketPriority.Media, StatusId = resueltoId });
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = technicianId, PriorityId = (await GetSeedCompanyCatalogAsync()).PriorityId, StatusId = nuevoId });
+            new { AssignedToId = technicianId, Priority = TicketPriority.Media, StatusId = nuevoId });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Null(await _factory.GetResolvedAtUtcAsync(ticketId));
@@ -272,12 +266,7 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{Guid.NewGuid()}",
-            new
-            {
-                AssignedToId = technicianId,
-                PriorityId = (await GetSeedCompanyCatalogAsync()).PriorityId,
-                StatusId = (await GetSeedCompanyCatalogAsync()).StatusId
-            });
+            new { AssignedToId = technicianId, Priority = TicketPriority.Media, StatusId = (await GetSeedCompanyCatalogAsync()).StatusId });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -293,12 +282,7 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new
-            {
-                AssignedToId = adminId,
-                PriorityId = (await GetSeedCompanyCatalogAsync()).PriorityId,
-                StatusId = (await GetSeedCompanyCatalogAsync()).StatusId
-            });
+            new { AssignedToId = adminId, Priority = TicketPriority.Media, StatusId = (await GetSeedCompanyCatalogAsync()).StatusId });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("AssignedToId", await GetValidationErrorsAsync(response));
@@ -322,12 +306,7 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new
-            {
-                AssignedToId = otherTechnicianId,
-                PriorityId = (await GetSeedCompanyCatalogAsync()).PriorityId,
-                StatusId = (await GetSeedCompanyCatalogAsync()).StatusId
-            });
+            new { AssignedToId = otherTechnicianId, Priority = TicketPriority.Media, StatusId = (await GetSeedCompanyCatalogAsync()).StatusId });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("AssignedToId", await GetValidationErrorsAsync(response));
@@ -351,37 +330,10 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new
-            {
-                AssignedToId = inactiveTechnicianId,
-                PriorityId = (await GetSeedCompanyCatalogAsync()).PriorityId,
-                StatusId = (await GetSeedCompanyCatalogAsync()).StatusId
-            });
+            new { AssignedToId = inactiveTechnicianId, Priority = TicketPriority.Media, StatusId = (await GetSeedCompanyCatalogAsync()).StatusId });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("AssignedToId", await GetValidationErrorsAsync(response));
-    }
-
-    [Fact]
-    public async Task Update_Returns400_WhenPriorityDoesNotExist()
-    {
-        await _factory.ResetTicketsAsync();
-        (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
-        Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket J", "Prioridad inválida");
-
-        using HttpClient client = await _factory.CreateClientForRoleAsync(Roles.Administrador);
-
-        HttpResponseMessage response = await client.PatchAsJsonAsync(
-            $"/api/admin/tickets/{ticketId}",
-            new
-            {
-                AssignedToId = technicianId,
-                PriorityId = Guid.NewGuid(),
-                StatusId = (await GetSeedCompanyCatalogAsync()).StatusId
-            });
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("PriorityId", await GetValidationErrorsAsync(response));
     }
 
     [Fact]
@@ -395,12 +347,7 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new
-            {
-                AssignedToId = technicianId,
-                PriorityId = (await GetSeedCompanyCatalogAsync()).PriorityId,
-                StatusId = Guid.NewGuid()
-            });
+            new { AssignedToId = technicianId, Priority = TicketPriority.Media, StatusId = Guid.NewGuid() });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("StatusId", await GetValidationErrorsAsync(response));
@@ -416,12 +363,12 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = Guid.Empty, PriorityId = Guid.Empty, StatusId = Guid.Empty });
+            new { AssignedToId = Guid.Empty, Priority = (TicketPriority)99, StatusId = Guid.Empty });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         IReadOnlyCollection<string> errors = await GetValidationErrorsAsync(response);
         Assert.Contains("AssignedToId", errors);
-        Assert.Contains("PriorityId", errors);
+        Assert.Contains("Priority", errors);
         Assert.Contains("StatusId", errors);
     }
 
@@ -435,7 +382,7 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = Guid.NewGuid(), PriorityId = Guid.NewGuid(), StatusId = Guid.NewGuid() });
+            new { AssignedToId = Guid.NewGuid(), Priority = TicketPriority.Media, StatusId = Guid.NewGuid() });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -449,28 +396,27 @@ public sealed class AdminTicketsEndpointTests
         return (companyId, adminId, technicianId, clientId);
     }
 
-    private async Task<(Guid CategoryId, Guid PriorityId, Guid StatusId)> GetSeedCompanyCatalogAsync()
+    private async Task<(Guid CategoryId, Guid StatusId)> GetSeedCompanyCatalogAsync()
     {
         Guid companyId = await _factory.GetCompanyIdAsync(CustomWebApplicationFactory.SeedCompanyName);
         return await GetCatalogAsync(companyId);
     }
 
-    private async Task<(Guid CategoryId, Guid PriorityId, Guid StatusId)> GetCatalogAsync(Guid companyId)
+    private async Task<(Guid CategoryId, Guid StatusId)> GetCatalogAsync(Guid companyId)
     {
         Guid categoryId = await _factory.GetCategoryIdAsync(companyId, "Hardware");
-        Guid priorityId = await _factory.GetPriorityIdAsync(companyId, "Media");
         Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
-        return (categoryId, priorityId, statusId);
+        return (categoryId, statusId);
     }
 
     private async Task<Guid> CreateSeedCompanyTicketAsync(string title, string description)
     {
         (Guid companyId, Guid adminId, _, _) = await GetSeedAsync();
-        (Guid categoryId, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+        (Guid categoryId, Guid statusId) = await GetCatalogAsync(companyId);
         return await _factory.CreateTicketAsync(
             companyId,
             categoryId,
-            priorityId,
+            TicketPriority.Media,
             statusId,
             adminId,
             title,
@@ -481,7 +427,7 @@ public sealed class AdminTicketsEndpointTests
     {
         Guid otherCompanyId = await _factory.CreateCompanyAsync("Competencia S.A.");
         await _factory.CreateCatalogAsync(otherCompanyId);
-        (Guid categoryId, Guid priorityId, Guid statusId) = await GetCatalogAsync(otherCompanyId);
+        (Guid categoryId, Guid statusId) = await GetCatalogAsync(otherCompanyId);
         Guid otherUserId = await _factory.CreateUserAsync(
             $"usuario-{Guid.NewGuid():N}@competencia.local",
             "Usuario",
@@ -492,7 +438,7 @@ public sealed class AdminTicketsEndpointTests
         return await _factory.CreateTicketAsync(
             otherCompanyId,
             categoryId,
-            priorityId,
+            TicketPriority.Media,
             statusId,
             otherUserId,
             "Ticket ajeno",

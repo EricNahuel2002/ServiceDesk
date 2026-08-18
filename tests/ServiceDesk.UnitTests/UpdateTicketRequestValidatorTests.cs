@@ -1,6 +1,7 @@
 using FluentValidation.Results;
 using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Application.Features.Tickets.Validators;
+using ServiceDesk.Domain.Enums;
 
 namespace ServiceDesk.UnitTests;
 
@@ -30,14 +31,14 @@ public class UpdateTicketRequestValidatorTests
     }
 
     [Fact]
-    public void Validate_EmptyPriorityId_ReturnsError()
+    public void Validate_InvalidPriority_ReturnsError()
     {
-        UpdateTicketRequest request = BuildValidRequest() with { PriorityId = Guid.Empty };
+        UpdateTicketRequest request = BuildValidRequest() with { Priority = (TicketPriority)99 };
 
         ValidationResult result = _validator.Validate(request);
 
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateTicketRequest.PriorityId));
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateTicketRequest.Priority));
     }
 
     [Fact]
@@ -55,7 +56,7 @@ public class UpdateTicketRequestValidatorTests
         new()
         {
             AssignedToId = Guid.NewGuid(),
-            PriorityId = Guid.NewGuid(),
+            Priority = TicketPriority.Media,
             StatusId = Guid.NewGuid()
         };
 }

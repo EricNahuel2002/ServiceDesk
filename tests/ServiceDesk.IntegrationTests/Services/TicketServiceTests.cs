@@ -4,6 +4,7 @@ using ServiceDesk.Application.Common.Exceptions;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
+using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
 
 namespace ServiceDesk.IntegrationTests.Services;
@@ -192,7 +193,6 @@ public sealed class TicketServiceTests
         await _factory.ResetTicketsAsync();
         (Guid companyId, Guid adminId, Guid technicianId, _) = await GetSeedAsync();
         Guid ticketId = await CreateTicketAsync(companyId, "Para actualizar");
-        Guid altaId = await _factory.GetPriorityIdAsync(companyId, "Alta");
         Guid enProgresoId = await _factory.GetStatusIdAsync(companyId, "En Progreso");
 
         await _factory.RunAsAsync(adminId, companyId, Roles.Administrador, async scope =>
@@ -204,12 +204,12 @@ public sealed class TicketServiceTests
                 new UpdateTicketRequest
                 {
                     AssignedToId = technicianId,
-                    PriorityId = altaId,
+                    Priority = TicketPriority.Alta,
                     StatusId = enProgresoId
                 });
 
             Assert.Equal(technicianId, updated.AssignedToId);
-            Assert.Equal(altaId, updated.PriorityId);
+            Assert.Equal(TicketPriority.Alta, updated.Priority);
             Assert.Equal(enProgresoId, updated.StatusId);
         });
 
@@ -233,7 +233,7 @@ public sealed class TicketServiceTests
                 new UpdateTicketRequest
                 {
                     AssignedToId = technicianId,
-                    PriorityId = (await GetCatalogAsync(companyId)).PriorityId,
+                    Priority = TicketPriority.Media,
                     StatusId = resueltoId
                 });
         });
@@ -247,7 +247,7 @@ public sealed class TicketServiceTests
         await _factory.ResetTicketsAsync();
         (Guid companyId, Guid adminId, _, _) = await GetSeedAsync();
         Guid ticketId = await CreateTicketAsync(companyId, "Sin técnico");
-        (_, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+        Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
 
         await _factory.RunAsAsync(adminId, companyId, Roles.Administrador, async scope =>
         {
@@ -259,7 +259,7 @@ public sealed class TicketServiceTests
                     new UpdateTicketRequest
                     {
                         AssignedToId = adminId,
-                        PriorityId = priorityId,
+                        Priority = TicketPriority.Media,
                         StatusId = statusId
                     }));
 
@@ -273,7 +273,7 @@ public sealed class TicketServiceTests
         await _factory.ResetTicketsAsync();
         (Guid companyId, Guid adminId, _, _) = await GetSeedAsync();
         Guid ticketId = await CreateTicketAsync(companyId, "Técnico ajeno");
-        (_, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+        Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
         Guid otherCompanyId = await _factory.CreateCompanyAsync("Otra Empresa S.A.");
         Guid otherTechnicianId = await _factory.CreateUserAsync(
             $"tecnico2-{Guid.NewGuid():N}@otra.local",
@@ -292,7 +292,7 @@ public sealed class TicketServiceTests
                     new UpdateTicketRequest
                     {
                         AssignedToId = otherTechnicianId,
-                        PriorityId = priorityId,
+                        Priority = TicketPriority.Media,
                         StatusId = statusId
                     }));
 
@@ -306,7 +306,7 @@ public sealed class TicketServiceTests
         await _factory.ResetTicketsAsync();
         (Guid companyId, Guid adminId, _, _) = await GetSeedAsync();
         Guid ticketId = await CreateTicketAsync(companyId, "Técnico inactivo");
-        (_, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+        Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
         Guid inactiveTechnicianId = await _factory.CreateUserAsync(
             $"tecnico.inactivo-{Guid.NewGuid():N}@servicedesk.local",
             "Técnico",
@@ -325,37 +325,11 @@ public sealed class TicketServiceTests
                     new UpdateTicketRequest
                     {
                         AssignedToId = inactiveTechnicianId,
-                        PriorityId = priorityId,
+                        Priority = TicketPriority.Media,
                         StatusId = statusId
                     }));
 
             Assert.Contains("AssignedToId", exception.Errors.Keys);
-        });
-    }
-
-    [Fact]
-    public async Task UpdateAsync_ThrowsValidation_WhenPriorityDoesNotExist()
-    {
-        await _factory.ResetTicketsAsync();
-        (Guid companyId, Guid adminId, Guid technicianId, _) = await GetSeedAsync();
-        Guid ticketId = await CreateTicketAsync(companyId, "Prioridad inválida");
-        (_, _, Guid statusId) = await GetCatalogAsync(companyId);
-
-        await _factory.RunAsAsync(adminId, companyId, Roles.Administrador, async scope =>
-        {
-            ITicketService service = scope.ServiceProvider.GetRequiredService<ITicketService>();
-
-            ValidationException exception = await Assert.ThrowsAsync<ValidationException>(() =>
-                service.UpdateAsync(
-                    ticketId,
-                    new UpdateTicketRequest
-                    {
-                        AssignedToId = technicianId,
-                        PriorityId = Guid.NewGuid(),
-                        StatusId = statusId
-                    }));
-
-            Assert.Contains("PriorityId", exception.Errors.Keys);
         });
     }
 
@@ -365,7 +339,6 @@ public sealed class TicketServiceTests
         await _factory.ResetTicketsAsync();
         (Guid companyId, Guid adminId, Guid technicianId, _) = await GetSeedAsync();
         Guid ticketId = await CreateTicketAsync(companyId, "Estado inválido");
-        (_, Guid priorityId, _) = await GetCatalogAsync(companyId);
 
         await _factory.RunAsAsync(adminId, companyId, Roles.Administrador, async scope =>
         {
@@ -377,7 +350,7 @@ public sealed class TicketServiceTests
                     new UpdateTicketRequest
                     {
                         AssignedToId = technicianId,
-                        PriorityId = priorityId,
+                        Priority = TicketPriority.Media,
                         StatusId = Guid.NewGuid()
                     }));
 
@@ -389,7 +362,7 @@ public sealed class TicketServiceTests
     public async Task UpdateAsync_ThrowsNotFound_ForUnknownTicket()
     {
         (Guid companyId, Guid adminId, Guid technicianId, _) = await GetSeedAsync();
-        (_, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+        Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
 
         await _factory.RunAsAsync(adminId, companyId, Roles.Administrador, async scope =>
         {
@@ -401,7 +374,7 @@ public sealed class TicketServiceTests
                     new UpdateTicketRequest
                     {
                         AssignedToId = technicianId,
-                        PriorityId = priorityId,
+                        Priority = TicketPriority.Media,
                         StatusId = statusId
                     }));
         });
@@ -414,7 +387,7 @@ public sealed class TicketServiceTests
         _factory.ResetQueue();
         (Guid companyId, Guid adminId, Guid technicianId, _) = await GetSeedAsync();
         Guid ticketId = await CreateTicketAsync(companyId, "Para asignar");
-        (_, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+        Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
 
         await _factory.RunAsAsync(adminId, companyId, Roles.Administrador, async scope =>
         {
@@ -425,7 +398,7 @@ public sealed class TicketServiceTests
                 new UpdateTicketRequest
                 {
                     AssignedToId = technicianId,
-                    PriorityId = priorityId,
+                    Priority = TicketPriority.Media,
                     StatusId = statusId
                 });
         });
@@ -447,7 +420,7 @@ public sealed class TicketServiceTests
         _factory.ResetQueue();
         (Guid companyId, Guid adminId, Guid technicianId, _) = await GetSeedAsync();
         Guid ticketId = await CreateTicketAsync(companyId, "Para notificar al cliente");
-        (_, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+        Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
 
         await _factory.RunAsAsync(adminId, companyId, Roles.Administrador, async scope =>
         {
@@ -458,7 +431,7 @@ public sealed class TicketServiceTests
                 new UpdateTicketRequest
                 {
                     AssignedToId = technicianId,
-                    PriorityId = priorityId,
+                    Priority = TicketPriority.Media,
                     StatusId = statusId
                 });
         });
@@ -480,7 +453,7 @@ public sealed class TicketServiceTests
         _factory.ResetQueue();
         (Guid companyId, Guid adminId, Guid technicianId, _) = await GetSeedAsync();
         Guid ticketId = await CreateTicketAsync(companyId, "Ya asignado", assignedToId: technicianId);
-        (_, Guid priorityId, Guid statusId) = await GetCatalogAsync(companyId);
+        Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
 
         await _factory.RunAsAsync(adminId, companyId, Roles.Administrador, async scope =>
         {
@@ -491,7 +464,7 @@ public sealed class TicketServiceTests
                 new UpdateTicketRequest
                 {
                     AssignedToId = technicianId,
-                    PriorityId = priorityId,
+                    Priority = TicketPriority.Media,
                     StatusId = statusId
                 });
         });
@@ -509,14 +482,6 @@ public sealed class TicketServiceTests
         return (companyId, adminId, technicianId, clientId);
     }
 
-    private async Task<(Guid CategoryId, Guid PriorityId, Guid StatusId)> GetCatalogAsync(Guid companyId)
-    {
-        Guid categoryId = await _factory.GetCategoryIdAsync(companyId, "Hardware");
-        Guid priorityId = await _factory.GetPriorityIdAsync(companyId, "Media");
-        Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
-        return (categoryId, priorityId, statusId);
-    }
-
     private async Task<Guid> CreateTicketAsync(
         Guid companyId,
         string title,
@@ -525,11 +490,12 @@ public sealed class TicketServiceTests
         DateTime? createdAtUtc = null)
     {
         (_, Guid adminId, _, _) = await GetSeedAsync();
-        (Guid categoryId, Guid priorityId, Guid defaultStatusId) = await GetCatalogAsync(companyId);
+        Guid categoryId = await _factory.GetCategoryIdAsync(companyId, "Hardware");
+        Guid defaultStatusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
         return await _factory.CreateTicketAsync(
             companyId,
             categoryId,
-            priorityId,
+            TicketPriority.Media,
             statusId ?? defaultStatusId,
             adminId,
             title,
@@ -542,7 +508,8 @@ public sealed class TicketServiceTests
     {
         Guid otherCompanyId = await _factory.CreateCompanyAsync("Competencia S.A.");
         await _factory.CreateCatalogAsync(otherCompanyId);
-        (Guid categoryId, Guid priorityId, Guid statusId) = await GetCatalogAsync(otherCompanyId);
+        Guid categoryId = await _factory.GetCategoryIdAsync(otherCompanyId, "Hardware");
+        Guid statusId = await _factory.GetStatusIdAsync(otherCompanyId, "Nuevo");
         Guid otherUserId = await _factory.CreateUserAsync(
             $"usuario-{Guid.NewGuid():N}@competencia.local",
             "Usuario",
@@ -553,7 +520,7 @@ public sealed class TicketServiceTests
         return await _factory.CreateTicketAsync(
             otherCompanyId,
             categoryId,
-            priorityId,
+            TicketPriority.Media,
             statusId,
             otherUserId,
             "Ticket ajeno",

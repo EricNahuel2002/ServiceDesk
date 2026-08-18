@@ -68,59 +68,6 @@ public sealed class CatalogServiceTests
     }
 
     [Fact]
-    public async Task GetPrioritiesAsync_ReturnsOnlyActivePrioritiesOfCurrentCompany()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Guid otherCompanyId = Guid.NewGuid();
-
-        context.Priorities.AddRange(
-            CreatePriority(CompanyId, "Baja", 1),
-            CreatePriority(CompanyId, "Alta", 3),
-            CreatePriority(CompanyId, "Urgente", 4, isActive: false),
-            CreatePriority(otherCompanyId, "Interna", 1));
-
-        await context.SaveChangesAsync();
-
-        ICatalogService service = CreateService(context);
-
-        IReadOnlyList<PriorityDto> priorities = await service.GetPrioritiesAsync();
-
-        Assert.Equal(2, priorities.Count);
-        Assert.Equal(["Baja", "Alta"], priorities.Select(priority => priority.Name));
-    }
-
-    [Fact]
-    public async Task GetPrioritiesAsync_ReturnsEmpty_WhenCompanyHasNoPriorities()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        context.Priorities.Add(CreatePriority(Guid.NewGuid(), "Interna", 1));
-        await context.SaveChangesAsync();
-
-        ICatalogService service = CreateService(context);
-
-        IReadOnlyList<PriorityDto> priorities = await service.GetPrioritiesAsync();
-
-        Assert.Empty(priorities);
-    }
-
-    [Fact]
-    public async Task GetPrioritiesAsync_ReturnsPrioritiesOrderedBySortOrder()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        context.Priorities.AddRange(
-            CreatePriority(CompanyId, "Media", 2),
-            CreatePriority(CompanyId, "Urgente", 4),
-            CreatePriority(CompanyId, "Baja", 1));
-        await context.SaveChangesAsync();
-
-        ICatalogService service = CreateService(context);
-
-        IReadOnlyList<PriorityDto> priorities = await service.GetPrioritiesAsync();
-
-        Assert.Equal(["Baja", "Media", "Urgente"], priorities.Select(priority => priority.Name));
-    }
-
-    [Fact]
     public async Task GetStatusesAsync_ReturnsOnlyActiveStatusesOfCurrentCompany()
     {
         await using ServiceDeskDbContext context = CreateContext();
@@ -204,16 +151,11 @@ public sealed class CatalogServiceTests
             context,
             new CreateCategoryRequestValidator(),
             new UpdateCategoryRequestValidator(),
-            new CreatePriorityRequestValidator(),
-            new UpdatePriorityRequestValidator(),
             new CreateStatusRequestValidator(),
             new UpdateStatusRequestValidator());
 
     private static Category CreateCategory(Guid companyId, string name, bool isActive = true) =>
         new() { Id = Guid.NewGuid(), CompanyId = companyId, Name = name, IsActive = isActive };
-
-    private static Priority CreatePriority(Guid companyId, string name, int sortOrder, bool isActive = true) =>
-        new() { Id = Guid.NewGuid(), CompanyId = companyId, Name = name, SortOrder = sortOrder, IsActive = isActive };
 
     private static Status CreateStatus(
         Guid companyId,
