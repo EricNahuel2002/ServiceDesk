@@ -64,6 +64,18 @@ public static class DependencyInjection
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
                     ClockSkew = TimeSpan.Zero
                 };
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        string? accessToken = context.Request.Query["access_token"];
+                        if (!string.IsNullOrEmpty(accessToken))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
         services.AddAuthorizationBuilder()
@@ -79,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<ICompanyRepository, CompanyRepository>();
+        services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<ServiceDeskDbInitializer>();

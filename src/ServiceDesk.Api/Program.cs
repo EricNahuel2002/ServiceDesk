@@ -1,6 +1,7 @@
 using Azure.Identity;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using ServiceDesk.Api.Hubs;
 using ServiceDesk.Api.Middleware;
 using ServiceDesk.Application;
 using ServiceDesk.Application.Common.Interfaces;
@@ -20,6 +21,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSignalR();
 
 builder.Services.AddSwaggerGen(options =>
 {
@@ -52,7 +54,8 @@ builder.Services.AddCors(options =>
 
         policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -90,6 +93,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.Run();
 

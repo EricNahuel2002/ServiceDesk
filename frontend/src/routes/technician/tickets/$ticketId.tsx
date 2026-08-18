@@ -4,6 +4,7 @@ import { Card } from '../../../components/common/Card'
 import { Badge } from '../../../components/common/Badge'
 import { Button } from '../../../components/common/Button'
 import { TechnicianAppShell } from '../../../components/layout/TechnicianAppShell'
+import { ChatPanel } from '../../../components/chat/ChatPanel'
 import { useTechnicianTicket, useResolveTicket, useIsTechnicianTicketClosed } from '../../../features/technician/queries'
 import { requireTecnico } from '../../../features/technician/auth'
 import { formatDate } from '../../../utils/format'
@@ -148,6 +149,13 @@ function TechnicianTicketDetailPage() {
             </div>
           </div>
         </Card>
+
+        {!isClosed(t) && (
+          <Card>
+            <h3 className="mb-3 text-sm font-semibold text-gray-900">Chat con el cliente</h3>
+            <ChatPanel ticketId={ticketId} />
+          </Card>
+        )}
 
         {!isClosed(t) && (
           <Card>

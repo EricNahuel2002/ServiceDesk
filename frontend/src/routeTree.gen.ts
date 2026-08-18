@@ -15,6 +15,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as TechnicianIndexRouteImport } from './routes/technician/index'
 import { Route as TicketsIndexRouteImport } from './routes/tickets/index'
+import { Route as TicketsTicketIdRouteImport } from './routes/tickets/$ticketId'
 import { Route as TicketsMisTicketsRouteImport } from './routes/tickets/mis-tickets'
 import { Route as AdminCatalogsIndexRouteImport } from './routes/admin/catalogs/index'
 import { Route as AdminTechniciansIndexRouteImport } from './routes/admin/technicians/index'
@@ -51,6 +52,11 @@ const TicketsIndexRoute = TicketsIndexRouteImport.update({
   path: '/tickets/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TicketsTicketIdRoute = TicketsTicketIdRouteImport.update({
+  id: '/tickets/$ticketId',
+  path: '/tickets/$ticketId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TicketsMisTicketsRoute = TicketsMisTicketsRouteImport.update({
   id: '/tickets/mis-tickets',
   path: '/tickets/mis-tickets',
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/tickets/$ticketId': typeof TicketsTicketIdRoute
   '/tickets/mis-tickets': typeof TicketsMisTicketsRoute
   '/admin/': typeof AdminIndexRoute
   '/technician/': typeof TechnicianIndexRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/tickets/$ticketId': typeof TicketsTicketIdRoute
   '/tickets/mis-tickets': typeof TicketsMisTicketsRoute
   '/admin': typeof AdminIndexRoute
   '/technician': typeof TechnicianIndexRoute
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/tickets/$ticketId': typeof TicketsTicketIdRoute
   '/tickets/mis-tickets': typeof TicketsMisTicketsRoute
   '/admin/': typeof AdminIndexRoute
   '/technician/': typeof TechnicianIndexRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
+    | '/tickets/$ticketId'
     | '/tickets/mis-tickets'
     | '/admin/'
     | '/technician/'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
+    | '/tickets/$ticketId'
     | '/tickets/mis-tickets'
     | '/admin'
     | '/technician'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
+    | '/tickets/$ticketId'
     | '/tickets/mis-tickets'
     | '/admin/'
     | '/technician/'
@@ -164,6 +176,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  TicketsTicketIdRoute: typeof TicketsTicketIdRoute
   TicketsMisTicketsRoute: typeof TicketsMisTicketsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   TechnicianIndexRoute: typeof TechnicianIndexRoute
@@ -218,6 +231,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TicketsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tickets/$ticketId': {
+      id: '/tickets/$ticketId'
+      path: '/tickets/$ticketId'
+      fullPath: '/tickets/$ticketId'
+      preLoaderRoute: typeof TicketsTicketIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tickets/mis-tickets': {
       id: '/tickets/mis-tickets'
       path: '/tickets/mis-tickets'
@@ -260,6 +280,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  TicketsTicketIdRoute: TicketsTicketIdRoute,
   TicketsMisTicketsRoute: TicketsMisTicketsRoute,
   AdminIndexRoute: AdminIndexRoute,
   TechnicianIndexRoute: TechnicianIndexRoute,

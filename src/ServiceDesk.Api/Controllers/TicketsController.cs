@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ServiceDesk.Application.Common.Interfaces;
+using ServiceDesk.Application.DTOs.Chat;
 using ServiceDesk.Application.DTOs.Tickets;
 
 namespace ServiceDesk.Api.Controllers;
@@ -11,10 +12,12 @@ namespace ServiceDesk.Api.Controllers;
 public sealed class TicketsController : ControllerBase
 {
     private readonly ITicketService _ticketService;
+    private readonly IChatService _chatService;
 
-    public TicketsController(ITicketService ticketService)
+    public TicketsController(ITicketService ticketService, IChatService chatService)
     {
         _ticketService = ticketService;
+        _chatService = chatService;
     }
 
     [HttpPost]
@@ -73,6 +76,19 @@ public sealed class TicketsController : ControllerBase
         IReadOnlyList<TicketDto> tickets = await _ticketService.GetMineAsync(cancellationToken);
 
         return Ok(tickets);
+    }
+
+    [HttpGet("{ticketId:guid}/chat")]
+    [ProducesResponseType(typeof(IReadOnlyList<ChatMessageDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<IReadOnlyList<ChatMessageDto>>> GetChatHistory(
+        Guid ticketId,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ChatMessageDto> messages = await _chatService.GetHistoryAsync(ticketId, cancellationToken);
+
+        return Ok(messages);
     }
 
     private static async Task<List<TicketFileUpload>> ReadFilesAsync(

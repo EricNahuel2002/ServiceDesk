@@ -37,6 +37,8 @@ public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

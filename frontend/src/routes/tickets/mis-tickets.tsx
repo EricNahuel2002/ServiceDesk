@@ -98,13 +98,15 @@ function MyTicketsPage() {
                   assignedToLastName={ticket.assignedToLastName}
                   assignedToEmail={ticket.assignedToEmail}
                   action={
-                    <button
-                      type="button"
-                      aria-label="Enviar mensaje"
-                      className="inline-flex w-full items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
-                    >
-                      Enviar mensaje
-                    </button>
+                    ticket.assignedToId ? (
+                      <Link
+                        to="/tickets/$ticketId"
+                        params={{ ticketId: ticket.id }}
+                        className="inline-flex w-full items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
+                      >
+                        Ver chat
+                      </Link>
+                    ) : undefined
                   }
                 />
               </Card>
