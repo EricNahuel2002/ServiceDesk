@@ -207,6 +207,8 @@ public sealed class TicketService : ITicketService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        await EnqueueClientWorkNotificationAsync(ticket.Id, NotificationEvents.WorkStarted, cancellationToken);
+
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
@@ -274,6 +276,8 @@ public sealed class TicketService : ITicketService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        await EnqueueClientWorkNotificationAsync(ticket.Id, NotificationEvents.WorkFinished, cancellationToken);
+
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
@@ -299,6 +303,8 @@ public sealed class TicketService : ITicketService
 
         bool priorityChanged = ticket.Priority != request.Priority;
 
+        bool wasResolved = ticket.ResolvedAtUtc is null && status.IsClosed;
+
         ticket.AssignedToId = request.AssignedToId;
         ticket.Priority = request.Priority;
         ticket.StatusId = request.StatusId;
@@ -319,6 +325,11 @@ public sealed class TicketService : ITicketService
         {
             await EnqueueAssignedNotificationAsync(ticket, cancellationToken);
             await EnqueueClientAssignedNotificationAsync(ticket, cancellationToken);
+        }
+
+        if (wasResolved)
+        {
+            await EnqueueClientWorkNotificationAsync(ticket.Id, NotificationEvents.WorkFinished, cancellationToken);
         }
 
         return await GetByIdAsync(ticket.Id, cancellationToken);
@@ -440,6 +451,22 @@ public sealed class TicketService : ITicketService
         string payload = JsonSerializer.Serialize(notification);
 
         await _queueStorage.EnqueueClientNotificationAsync(payload, cancellationToken);
+    }
+
+    private async Task EnqueueClientWorkNotificationAsync(
+        Guid ticketId,
+        string eventType,
+        CancellationToken cancellationToken)
+    {
+        TicketAssignedNotification notification = new()
+        {
+            EventType = eventType,
+            TicketId = ticketId
+        };
+
+        string payload = JsonSerializer.Serialize(notification);
+
+        await _queueStorage.EnqueueClientWorkNotificationAsync(payload, cancellationToken);
     }
 
     private async Task<Guid> FindInitialStatusIdAsync(Guid companyId, CancellationToken cancellationToken)

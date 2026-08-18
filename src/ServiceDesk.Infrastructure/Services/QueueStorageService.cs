@@ -31,6 +31,9 @@ public sealed class QueueStorageService : IQueueStorageService
     public Task EnqueueClientNotificationAsync(string message, CancellationToken cancellationToken = default) =>
         EnqueueToQueueAsync(_settings.ClientNotificationQueueName, message, cancellationToken);
 
+    public Task EnqueueClientWorkNotificationAsync(string message, CancellationToken cancellationToken = default) =>
+        EnqueueToQueueAsync(_settings.ClientWorkNotificationQueueName, message, cancellationToken);
+
     private async Task EnqueueToQueueAsync(
         string queueName,
         string message,
