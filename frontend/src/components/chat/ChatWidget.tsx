@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
 import { useChatWidget } from '../../features/chat/useChatWidget'
 import { useRegisterOpenChat } from '../../features/chat/ChatWidgetContext'
@@ -17,6 +18,7 @@ interface ChatWidgetProps {
 
 export function ChatWidget({ tickets }: ChatWidgetProps) {
   const { isAuthenticated } = useAuth()
+  const queryClient = useQueryClient()
   const registerOpenChat = useRegisterOpenChat()
   const [isOpen, setIsOpen] = useState(false)
   const {
@@ -26,7 +28,7 @@ export function ChatWidget({ tickets }: ChatWidgetProps) {
     totalUnread,
     openChat,
     closeChat,
-  } = useChatWidget(tickets)
+  } = useChatWidget(tickets, queryClient)
 
   const openChatForTicket = useCallback((ticketId: string) => {
     setIsOpen(true)

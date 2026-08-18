@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { QueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
 import { chatConnection } from './signalr'
 import type { ChatMessageDto } from './types'
@@ -16,7 +17,7 @@ interface LastMessage {
   [ticketId: string]: ChatMessageDto
 }
 
-export function useChatWidget(tickets: TicketInfo[]) {
+export function useChatWidget(tickets: TicketInfo[], queryClient: QueryClient) {
   const { user, isAuthenticated } = useAuth()
   const [unreadCounts, setUnreadCounts] = useState<UnreadCount>({})
   const [lastMessages, setLastMessages] = useState<LastMessage>({})
@@ -62,6 +63,8 @@ export function useChatWidget(tickets: TicketInfo[]) {
           ...prev,
           [ticket.id]: message,
         }))
+
+        queryClient.invalidateQueries({ queryKey: ['chat', ticket.id] })
       })
       unsubs.push(unsub)
     }
@@ -88,7 +91,7 @@ export function useChatWidget(tickets: TicketInfo[]) {
       mounted = false
       unsubs.forEach((u) => u())
     }
-  }, [tickets, user, isAuthenticated])
+  }, [tickets, user, isAuthenticated, queryClient])
 
   const openChat = useCallback((ticketId: string) => {
     setActiveChatTicketId(ticketId)
