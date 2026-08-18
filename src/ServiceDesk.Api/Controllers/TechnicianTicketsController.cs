@@ -30,6 +30,22 @@ public sealed class TechnicianTicketsController : ControllerBase
         return Ok(tickets);
     }
 
+    [HttpPatch("{id:guid}/start-work")]
+    [ProducesResponseType(typeof(TicketDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<TicketDto>> StartWork(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        TicketDto ticket = await _ticketService.StartWorkAsync(id, cancellationToken);
+
+        return Ok(ticket);
+    }
+
     [HttpPatch("{id:guid}/resolve")]
     [ProducesResponseType(typeof(TicketDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]

@@ -50,38 +50,6 @@ public sealed class AdminCatalogController : ControllerBase
         return Ok(category);
     }
 
-    [HttpGet("priorities")]
-    [ProducesResponseType(typeof(IReadOnlyList<PriorityDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<PriorityDto>>> GetPriorities(CancellationToken cancellationToken)
-    {
-        IReadOnlyList<PriorityDto> priorities = await _catalogService.GetAllPrioritiesAsync(cancellationToken);
-        return Ok(priorities);
-    }
-
-    [HttpPost("priorities")]
-    [ProducesResponseType(typeof(PriorityDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<PriorityDto>> CreatePriority(
-        CreatePriorityRequest request,
-        CancellationToken cancellationToken)
-    {
-        PriorityDto priority = await _catalogService.CreatePriorityAsync(request, cancellationToken);
-        return CreatedAtAction(nameof(GetPriorities), new { }, priority);
-    }
-
-    [HttpPut("priorities/{id:guid}")]
-    [ProducesResponseType(typeof(PriorityDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<PriorityDto>> UpdatePriority(
-        Guid id,
-        UpdatePriorityRequest request,
-        CancellationToken cancellationToken)
-    {
-        PriorityDto priority = await _catalogService.UpdatePriorityAsync(id, request, cancellationToken);
-        return Ok(priority);
-    }
-
     [HttpGet("statuses")]
     [ProducesResponseType(typeof(IReadOnlyList<StatusDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<StatusDto>>> GetStatuses(CancellationToken cancellationToken)

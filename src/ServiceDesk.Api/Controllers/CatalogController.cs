@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Catalog;
+using ServiceDesk.Domain.Enums;
 
 namespace ServiceDesk.Api.Controllers;
 
@@ -29,12 +30,17 @@ public sealed class CatalogController : ControllerBase
     }
 
     [HttpGet("priorities")]
-    [ProducesResponseType(typeof(IReadOnlyList<PriorityDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IReadOnlyList<TicketPriority>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IReadOnlyList<PriorityDto>>> GetPriorities(CancellationToken cancellationToken)
+    public ActionResult<IReadOnlyList<TicketPriority>> GetPriorities()
     {
-        IReadOnlyList<PriorityDto> priorities = await _catalogService.GetPrioritiesAsync(cancellationToken);
+        IReadOnlyList<TicketPriority> priorities =
+        [
+            TicketPriority.Baja,
+            TicketPriority.Media,
+            TicketPriority.Alta,
+            TicketPriority.Critica
+        ];
 
         return Ok(priorities);
     }
