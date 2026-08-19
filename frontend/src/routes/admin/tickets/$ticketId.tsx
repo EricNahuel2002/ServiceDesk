@@ -163,6 +163,16 @@ function AdminTicketDetailPage() {
                     </span>
                   </div>
                 )}
+                {t.resolvedAtUtc && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Resuelto
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatDate(t.resolvedAtUtc)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </Card>

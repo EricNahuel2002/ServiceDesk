@@ -26,6 +26,12 @@ const presets = [
   { label: 'Todo', from: undefined, to: undefined },
 ]
 
+const periods = [
+  { value: 'day', label: 'Día' },
+  { value: 'week', label: 'Semana' },
+  { value: 'month', label: 'Mes' },
+]
+
 function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -57,12 +63,14 @@ function AdminMetricsPage() {
   const technicians = useTechnicians()
   const [presetIdx, setPresetIdx] = useState(0)
   const [technicianId, setTechnicianId] = useState<string>('')
+  const [period, setPeriod] = useState<string>('day')
 
   const preset = presets[presetIdx]
   const params = {
     from: preset.from,
     to: preset.to,
     technicianId: technicianId || undefined,
+    period,
   }
 
   const metrics = useMetrics(params)
@@ -77,7 +85,7 @@ function AdminMetricsPage() {
       }))
     : []
 
-  const dailyChartData = data
+  const trendChartData = data
     ? data.dailyTrend.map((d) => ({
         date: d.date,
         Creados: d.created,
@@ -92,6 +100,10 @@ function AdminMetricsPage() {
         Resueltos: t.resolvedCount,
       }))
     : []
+
+  const trendLabel = period === 'week' ? 'Tendencia semanal'
+    : period === 'month' ? 'Tendencia mensual'
+    : 'Tendencia diaria'
 
   return (
     <AdminAppShell>
@@ -108,6 +120,23 @@ function AdminMetricsPage() {
               onClick={() => setPresetIdx(i)}
               className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                 presetIdx === i
+                  ? 'bg-[#0F52BA] text-white'
+                  : 'text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-100 p-1">
+          {periods.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => setPeriod(p.value)}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                period === p.value
                   ? 'bg-[#0F52BA] text-white'
                   : 'text-gray-600 hover:bg-gray-200'
               }`}
@@ -157,7 +186,7 @@ function AdminMetricsPage() {
             </Card>
           </div>
 
-          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <p className="text-sm text-gray-500">Cumplimiento SLA</p>
               <p className="mt-1 text-2xl font-semibold text-green-600">
@@ -174,14 +203,20 @@ function AdminMetricsPage() {
                 {data.averageResolutionHours}h
               </p>
             </Card>
+            <Card>
+              <p className="text-sm text-gray-500">Tiempo promedio de inicio</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900">
+                {data.averageStartHours}h
+              </p>
+            </Card>
           </div>
 
           <div className="mb-6 grid gap-6 lg:grid-cols-2">
             <Card>
-              <h3 className="mb-4 text-sm font-semibold text-gray-900">Tendencia diaria</h3>
-              {dailyChartData.length > 0 ? (
+              <h3 className="mb-4 text-sm font-semibold text-gray-900">{trendLabel}</h3>
+              {trendChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={dailyChartData}>
+                  <LineChart data={trendChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                     <YAxis allowDecimals={false} />
@@ -251,6 +286,7 @@ function AdminMetricsPage() {
                       <th className="pb-2 font-medium">Asignados</th>
                       <th className="pb-2 font-medium">Resueltos</th>
                       <th className="pb-2 font-medium">Promedio resolución</th>
+                      <th className="pb-2 font-medium">Promedio inicio</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -263,6 +299,9 @@ function AdminMetricsPage() {
                         <td className="py-2 text-gray-700">{t.resolvedCount}</td>
                         <td className="py-2 text-gray-700">
                           {t.averageResolutionHours > 0 ? `${t.averageResolutionHours}h` : '—'}
+                        </td>
+                        <td className="py-2 text-gray-700">
+                          {t.averageStartHours > 0 ? `${t.averageStartHours}h` : '—'}
                         </td>
                       </tr>
                     ))}

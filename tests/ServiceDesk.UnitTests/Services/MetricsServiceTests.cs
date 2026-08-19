@@ -17,7 +17,7 @@ public sealed class MetricsServiceTests
     {
         MetricsService service = CreateService([]);
 
-        AdminMetricsDto result = await service.GetAdminMetricsAsync(null, null, null, CancellationToken.None);
+        AdminMetricsDto result = await service.GetAdminMetricsAsync(null, null, null, null, CancellationToken.None);
 
         Assert.Equal(0, result.TotalTickets);
         Assert.Equal(0, result.OpenTickets);
@@ -45,7 +45,7 @@ public sealed class MetricsServiceTests
         MetricsService service = CreateService(tickets);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            null, null, TechnicianA, CancellationToken.None);
+            null, null, TechnicianA, null, CancellationToken.None);
 
         Assert.Equal(2, result.TotalTickets);
         Assert.Equal(1, result.ResolvedTickets);
@@ -68,7 +68,7 @@ public sealed class MetricsServiceTests
         DateOnly to = DateOnly.FromDateTime(now);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            from, to, null, CancellationToken.None);
+            from, to, null, null, CancellationToken.None);
 
         Assert.Equal(2, result.TotalTickets);
     }
@@ -88,7 +88,7 @@ public sealed class MetricsServiceTests
         MetricsService service = CreateService(tickets);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            null, null, null, CancellationToken.None);
+            null, null, null, null, CancellationToken.None);
 
         Assert.Equal(1, result.OverdueTickets);
         Assert.Equal(0, result.SlaCompliancePercentage);
@@ -109,7 +109,7 @@ public sealed class MetricsServiceTests
         MetricsService service = CreateService(tickets);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            null, null, null, CancellationToken.None);
+            null, null, null, null, CancellationToken.None);
 
         Assert.Equal(1, result.TotalTickets);
         Assert.Equal(1, result.InProgressTickets);
@@ -130,7 +130,7 @@ public sealed class MetricsServiceTests
         MetricsService service = CreateService(tickets);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            null, null, null, CancellationToken.None);
+            null, null, null, null, CancellationToken.None);
 
         Assert.Equal(0, result.OverdueTickets);
         Assert.Equal(100, result.SlaCompliancePercentage);
@@ -150,7 +150,7 @@ public sealed class MetricsServiceTests
         MetricsService service = CreateService(tickets);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            null, null, null, CancellationToken.None);
+            null, null, null, null, CancellationToken.None);
 
         Assert.Equal(2, result.TotalTickets);
         Assert.Equal(1, result.ResolvedTickets);
@@ -171,9 +171,29 @@ public sealed class MetricsServiceTests
         MetricsService service = CreateService(tickets);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            null, null, null, CancellationToken.None);
+            null, null, null, null, CancellationToken.None);
 
         Assert.Equal(3.0m, result.AverageResolutionHours);
+    }
+
+    [Fact]
+    public async Task GetAdminMetricsAsync_ComputesAverageStartHours()
+    {
+        DateTime now = DateTime.UtcNow;
+        List<TicketMetricsRecord> tickets =
+        [
+            CreateTicket(TicketPriority.Alta, TechnicianA, "En Progreso", now.AddDays(-5),
+                startedAt: now.AddDays(-5).AddHours(1)),
+            CreateTicket(TicketPriority.Alta, TechnicianA, "En Progreso", now.AddDays(-4),
+                startedAt: now.AddDays(-4).AddHours(3)),
+        ];
+
+        MetricsService service = CreateService(tickets);
+
+        AdminMetricsDto result = await service.GetAdminMetricsAsync(
+            null, null, null, null, CancellationToken.None);
+
+        Assert.Equal(2.0m, result.AverageStartHours);
     }
 
     [Fact]
@@ -190,7 +210,7 @@ public sealed class MetricsServiceTests
         MetricsService service = CreateService(tickets);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            null, null, null, CancellationToken.None);
+            null, null, null, null, CancellationToken.None);
 
         Assert.Equal(2, result.ByPriority.Count);
 
@@ -216,7 +236,7 @@ public sealed class MetricsServiceTests
         MetricsService service = CreateService(tickets);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            null, null, null, CancellationToken.None);
+            null, null, null, null, CancellationToken.None);
 
         Assert.Equal(2, result.ByTechnician.Count);
 
@@ -240,7 +260,7 @@ public sealed class MetricsServiceTests
         MetricsService service = CreateService(tickets);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            null, null, null, CancellationToken.None);
+            null, null, null, null, CancellationToken.None);
 
         Assert.Equal(2, result.DailyTrend.Count);
 
@@ -249,6 +269,62 @@ public sealed class MetricsServiceTests
 
         DailyMetricDto todayMetric = result.DailyTrend.First(d => d.Date == DateOnly.FromDateTime(today));
         Assert.Equal(1, todayMetric.Created);
+    }
+
+    [Fact]
+    public async Task GetAdminMetricsAsync_GroupsByWeek()
+    {
+        DateTime now = DateTime.UtcNow;
+        DateTime thisMonday = now.AddDays(-(int)now.DayOfWeek + (int)DayOfWeek.Monday);
+        DateTime lastMonday = thisMonday.AddDays(-7);
+
+        List<TicketMetricsRecord> tickets =
+        [
+            CreateTicket(TicketPriority.Alta, TechnicianA, "Nuevo", lastMonday.AddDays(1)),
+            CreateTicket(TicketPriority.Media, TechnicianA, "Nuevo", lastMonday.AddDays(3)),
+            CreateTicket(TicketPriority.Baja, TechnicianA, "Nuevo", thisMonday.AddDays(1)),
+        ];
+
+        MetricsService service = CreateService(tickets);
+
+        AdminMetricsDto result = await service.GetAdminMetricsAsync(
+            null, null, null, "week", CancellationToken.None);
+
+        Assert.Equal(2, result.DailyTrend.Count);
+
+        DailyMetricDto lastWeek = result.DailyTrend.First(d => d.Date == DateOnly.FromDateTime(lastMonday));
+        Assert.Equal(2, lastWeek.Created);
+
+        DailyMetricDto thisWeek = result.DailyTrend.First(d => d.Date == DateOnly.FromDateTime(thisMonday));
+        Assert.Equal(1, thisWeek.Created);
+    }
+
+    [Fact]
+    public async Task GetAdminMetricsAsync_GroupsByMonth()
+    {
+        DateTime now = DateTime.UtcNow;
+        DateTime thisMonthStart = new(now.Year, now.Month, 1);
+        DateTime lastMonthStart = thisMonthStart.AddMonths(-1);
+
+        List<TicketMetricsRecord> tickets =
+        [
+            CreateTicket(TicketPriority.Alta, TechnicianA, "Nuevo", lastMonthStart.AddDays(5)),
+            CreateTicket(TicketPriority.Media, TechnicianA, "Nuevo", thisMonthStart.AddDays(2)),
+            CreateTicket(TicketPriority.Baja, TechnicianA, "Nuevo", thisMonthStart.AddDays(10)),
+        ];
+
+        MetricsService service = CreateService(tickets);
+
+        AdminMetricsDto result = await service.GetAdminMetricsAsync(
+            null, null, null, "month", CancellationToken.None);
+
+        Assert.Equal(2, result.DailyTrend.Count);
+
+        DailyMetricDto lastMonth = result.DailyTrend.First(d => d.Date == DateOnly.FromDateTime(lastMonthStart));
+        Assert.Equal(1, lastMonth.Created);
+
+        DailyMetricDto thisMonth = result.DailyTrend.First(d => d.Date == DateOnly.FromDateTime(thisMonthStart));
+        Assert.Equal(2, thisMonth.Created);
     }
 
     [Fact]
@@ -263,10 +339,33 @@ public sealed class MetricsServiceTests
         MetricsService service = CreateService(tickets);
 
         AdminMetricsDto result = await service.GetAdminMetricsAsync(
-            null, null, null, CancellationToken.None);
+            null, null, null, null, CancellationToken.None);
 
         Assert.Equal(1, result.OpenTickets);
         Assert.Equal(0, result.InProgressTickets);
+    }
+
+    [Fact]
+    public async Task GetAdminMetricsAsync_TechnicianIncludesAverageStartHours()
+    {
+        DateTime now = DateTime.UtcNow;
+        List<TicketMetricsRecord> tickets =
+        [
+            CreateTicket(TicketPriority.Alta, TechnicianA, "Resuelto", now.AddDays(-3),
+                startedAt: now.AddDays(-3).AddHours(2),
+                resolvedAt: now.AddDays(-2)),
+            CreateTicket(TicketPriority.Alta, TechnicianA, "Resuelto", now.AddDays(-2),
+                startedAt: now.AddDays(-2).AddHours(4),
+                resolvedAt: now.AddDays(-1)),
+        ];
+
+        MetricsService service = CreateService(tickets);
+
+        AdminMetricsDto result = await service.GetAdminMetricsAsync(
+            null, null, null, null, CancellationToken.None);
+
+        TechnicianMetricDto techA = result.ByTechnician.First(t => t.UserId == TechnicianA);
+        Assert.Equal(3.0m, techA.AverageStartHours);
     }
 
     private static MetricsService CreateService(List<TicketMetricsRecord> tickets)

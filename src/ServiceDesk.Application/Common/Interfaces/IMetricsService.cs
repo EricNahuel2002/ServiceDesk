@@ -8,5 +8,6 @@ public interface IMetricsService
         DateOnly? from,
         DateOnly? to,
         Guid? technicianId,
+        string? period,
         CancellationToken cancellationToken = default);
 }

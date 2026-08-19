@@ -18,6 +18,7 @@ public sealed class MetricsService : IMetricsService
         DateOnly? from,
         DateOnly? to,
         Guid? technicianId,
+        string? period,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<TicketMetricsRecord> tickets = await _metricsRepository.GetTicketMetricsAsync(
@@ -37,19 +38,13 @@ public sealed class MetricsService : IMetricsService
         int resolved = tickets.Count(t => IsResolved(t));
         int overdue = tickets.Count(t => IsOverdue(t));
 
-        decimal avgResolutionHours = 0;
-        if (resolved > 0)
-        {
-            List<double> resolutionTimes = tickets
-                .Where(t => t.ResolvedAtUtc.HasValue && t.StartedWorkAtUtc.HasValue)
-                .Select(t => (t.ResolvedAtUtc!.Value - t.StartedWorkAtUtc!.Value).TotalHours)
-                .ToList();
+        decimal avgResolutionHours = ComputeAverage(
+            tickets.Where(t => t.ResolvedAtUtc.HasValue && t.StartedWorkAtUtc.HasValue)
+                .Select(t => (t.ResolvedAtUtc!.Value - t.StartedWorkAtUtc!.Value).TotalHours));
 
-            if (resolutionTimes.Count > 0)
-            {
-                avgResolutionHours = (decimal)resolutionTimes.Average();
-            }
-        }
+        decimal avgStartHours = ComputeAverage(
+            tickets.Where(t => t.StartedWorkAtUtc.HasValue)
+                .Select(t => (t.StartedWorkAtUtc!.Value - t.CreatedAtUtc).TotalHours));
 
         int slaCompliance = total > 0
             ? (int)Math.Round((decimal)(total - overdue) / total * 100)
@@ -66,16 +61,7 @@ public sealed class MetricsService : IMetricsService
             .OrderByDescending(x => (int)x.Priority)
             .ToList();
 
-        List<DailyMetricDto> dailyTrend = tickets
-            .GroupBy(t => DateOnly.FromDateTime(t.CreatedAtUtc))
-            .Select(g => new DailyMetricDto
-            {
-                Date = g.Key,
-                Created = g.Count(),
-                Resolved = g.Count(IsResolved)
-            })
-            .OrderBy(x => x.Date)
-            .ToList();
+        IReadOnlyList<DailyMetricDto> trend = GroupTrend(tickets, period);
 
         IReadOnlyList<TechnicianMetricDto> byTechnician = tickets
             .Where(t => t.AssignedToId.HasValue)
@@ -83,10 +69,13 @@ public sealed class MetricsService : IMetricsService
             .Select(g =>
             {
                 TicketMetricsRecord first = g.First();
-                List<double> resolvedTimes = g
-                    .Where(t => t.ResolvedAtUtc.HasValue && t.StartedWorkAtUtc.HasValue)
-                    .Select(t => (t.ResolvedAtUtc!.Value - t.StartedWorkAtUtc!.Value).TotalHours)
-                    .ToList();
+                decimal techAvgResolution = ComputeAverage(
+                    g.Where(t => t.ResolvedAtUtc.HasValue && t.StartedWorkAtUtc.HasValue)
+                        .Select(t => (t.ResolvedAtUtc!.Value - t.StartedWorkAtUtc!.Value).TotalHours));
+
+                decimal techAvgStart = ComputeAverage(
+                    g.Where(t => t.StartedWorkAtUtc.HasValue)
+                        .Select(t => (t.StartedWorkAtUtc!.Value - t.CreatedAtUtc).TotalHours));
 
                 return new TechnicianMetricDto
                 {
@@ -95,9 +84,8 @@ public sealed class MetricsService : IMetricsService
                     LastName = first.AssignedToLastName ?? string.Empty,
                     AssignedCount = g.Count(),
                     ResolvedCount = g.Count(IsResolved),
-                    AverageResolutionHours = resolvedTimes.Count > 0
-                        ? (decimal)resolvedTimes.Average()
-                        : 0
+                    AverageResolutionHours = techAvgResolution,
+                    AverageStartHours = techAvgStart
                 };
             })
             .OrderByDescending(x => x.AssignedCount)
@@ -111,11 +99,68 @@ public sealed class MetricsService : IMetricsService
             ResolvedTickets = resolved,
             OverdueTickets = overdue,
             AverageResolutionHours = Math.Round(avgResolutionHours, 1),
+            AverageStartHours = Math.Round(avgStartHours, 1),
             SlaCompliancePercentage = slaCompliance,
             ByPriority = byPriority,
-            DailyTrend = dailyTrend,
+            DailyTrend = trend,
             ByTechnician = byTechnician
         };
+    }
+
+    private static IReadOnlyList<DailyMetricDto> GroupTrend(
+        IReadOnlyList<TicketMetricsRecord> tickets,
+        string? period)
+    {
+        return period?.ToLowerInvariant() switch
+        {
+            "week" => tickets
+                .GroupBy(t => GetWeekStart(DateOnly.FromDateTime(t.CreatedAtUtc)))
+                .Select(g => new DailyMetricDto
+                {
+                    Date = g.Key,
+                    Created = g.Count(),
+                    Resolved = g.Count(IsResolved)
+                })
+                .OrderBy(x => x.Date)
+                .ToList(),
+            "month" => tickets
+                .GroupBy(t => GetMonthStart(DateOnly.FromDateTime(t.CreatedAtUtc)))
+                .Select(g => new DailyMetricDto
+                {
+                    Date = g.Key,
+                    Created = g.Count(),
+                    Resolved = g.Count(IsResolved)
+                })
+                .OrderBy(x => x.Date)
+                .ToList(),
+            _ => tickets
+                .GroupBy(t => DateOnly.FromDateTime(t.CreatedAtUtc))
+                .Select(g => new DailyMetricDto
+                {
+                    Date = g.Key,
+                    Created = g.Count(),
+                    Resolved = g.Count(IsResolved)
+                })
+                .OrderBy(x => x.Date)
+                .ToList()
+        };
+    }
+
+    private static DateOnly GetWeekStart(DateOnly date)
+    {
+        int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+        return date.AddDays(-diff);
+    }
+
+    private static DateOnly GetMonthStart(DateOnly date)
+    {
+        return new DateOnly(date.Year, date.Month, 1);
+    }
+
+    private static decimal ComputeAverage(IEnumerable<double> values)
+    {
+        List<double> list = values.ToList();
+        return list.Count > 0 ? (decimal)list.Average() : 0;
     }
 
     private static bool IsResolved(TicketMetricsRecord t)

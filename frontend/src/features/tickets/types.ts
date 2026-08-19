@@ -25,6 +25,7 @@ export interface TicketDto {
   updatedAtUtc: string | null
   responseDeadlineAtUtc: string
   startedWorkAtUtc: string | null
+  resolvedAtUtc: string | null
   slaLimitHours: number
   slaPercentageElapsed: number
   isOverdue: boolean

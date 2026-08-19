@@ -63,11 +63,13 @@ export function getMetrics(params: {
   from?: string
   to?: string
   technicianId?: string
+  period?: string
 }): Promise<AdminMetricsDto> {
   const searchParams = new URLSearchParams()
   if (params.from) searchParams.set('from', params.from)
   if (params.to) searchParams.set('to', params.to)
   if (params.technicianId) searchParams.set('technicianId', params.technicianId)
+  if (params.period) searchParams.set('period', params.period)
   const query = searchParams.toString()
   return apiClient.get<AdminMetricsDto>(`/admin/metrics${query ? `?${query}` : ''}`)
 }

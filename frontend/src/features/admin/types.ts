@@ -46,6 +46,7 @@ export interface AdminMetricsDto {
   resolvedTickets: number
   overdueTickets: number
   averageResolutionHours: number
+  averageStartHours: number
   slaCompliancePercentage: number
   byPriority: PriorityMetricDto[]
   dailyTrend: DailyMetricDto[]
@@ -71,4 +72,5 @@ export interface TechnicianMetricDto {
   assignedCount: number
   resolvedCount: number
   averageResolutionHours: number
+  averageStartHours: number
 }

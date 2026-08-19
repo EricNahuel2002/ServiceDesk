@@ -139,9 +139,9 @@ export function useCreateUser() {
   })
 }
 
-export function useMetrics(params: { from?: string; to?: string; technicianId?: string }) {
+export function useMetrics(params: { from?: string; to?: string; technicianId?: string; period?: string }) {
   return useQuery({
-    queryKey: ['admin', 'metrics', params.from, params.to, params.technicianId],
+    queryKey: ['admin', 'metrics', params.from, params.to, params.technicianId, params.period],
     queryFn: () => getMetrics(params),
   })
 }

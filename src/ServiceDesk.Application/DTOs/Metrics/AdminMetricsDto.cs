@@ -10,6 +10,7 @@ public sealed record AdminMetricsDto
     public int ResolvedTickets { get; init; }
     public int OverdueTickets { get; init; }
     public decimal AverageResolutionHours { get; init; }
+    public decimal AverageStartHours { get; init; }
     public decimal SlaCompliancePercentage { get; init; }
     public IReadOnlyList<PriorityMetricDto> ByPriority { get; init; } = [];
     public IReadOnlyList<DailyMetricDto> DailyTrend { get; init; } = [];
@@ -38,4 +39,5 @@ public sealed record TechnicianMetricDto
     public int AssignedCount { get; init; }
     public int ResolvedCount { get; init; }
     public decimal AverageResolutionHours { get; init; }
+    public decimal AverageStartHours { get; init; }
 }

@@ -27,12 +27,14 @@ public sealed class AdminMetricsController : ControllerBase
         [FromQuery] DateOnly? from,
         [FromQuery] DateOnly? to,
         [FromQuery] Guid? technicianId,
+        [FromQuery] string? period,
         CancellationToken cancellationToken)
     {
         AdminMetricsDto metrics = await _metricsService.GetAdminMetricsAsync(
             from,
             to,
             technicianId,
+            period,
             cancellationToken);
 
         return Ok(metrics);
