@@ -150,9 +150,7 @@ public sealed class CatalogServiceTests
             new FakeCurrentUserService(Guid.NewGuid(), CompanyId),
             context,
             new CreateCategoryRequestValidator(),
-            new UpdateCategoryRequestValidator(),
-            new CreateStatusRequestValidator(),
-            new UpdateStatusRequestValidator());
+            new UpdateCategoryRequestValidator());
 
     private static Category CreateCategory(Guid companyId, string name, bool isActive = true) =>
         new() { Id = Guid.NewGuid(), CompanyId = companyId, Name = name, IsActive = isActive };

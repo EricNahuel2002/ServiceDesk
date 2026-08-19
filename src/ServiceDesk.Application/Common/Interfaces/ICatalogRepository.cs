@@ -23,9 +23,5 @@ public interface ICatalogRepository
 
     Task AddCategoryAsync(Category category, CancellationToken cancellationToken = default);
 
-    Task AddStatusAsync(Status status, CancellationToken cancellationToken = default);
-
     Task<bool> CategoryNameExistsAsync(Guid companyId, string name, Guid? excludeId = null, CancellationToken cancellationToken = default);
-
-    Task<bool> StatusNameExistsAsync(Guid companyId, string name, Guid? excludeId = null, CancellationToken cancellationToken = default);
 }

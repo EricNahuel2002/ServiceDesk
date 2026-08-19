@@ -7,19 +7,6 @@ export interface UpdateCategoryRequest {
   isActive: boolean
 }
 
-export interface CreateStatusRequest {
-  name: string
-  sortOrder: number
-  isClosed: boolean
-}
-
-export interface UpdateStatusRequest {
-  name: string
-  sortOrder: number
-  isClosed: boolean
-  isActive: boolean
-}
-
 export interface CreateUserRequest {
   email: string
   password: string

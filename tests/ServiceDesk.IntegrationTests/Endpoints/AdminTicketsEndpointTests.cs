@@ -194,67 +194,23 @@ public sealed class AdminTicketsEndpointTests
     }
 
     [Fact]
-    public async Task Update_Returns200_AndAppliesAssignedToPriorityAndStatus()
+    public async Task Update_Returns200_AndAppliesAssignedToAndPriority()
     {
         await _factory.ResetTicketsAsync();
         (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
         Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket D", "Para actualizar");
-        Guid enProgresoId = await _factory.GetStatusIdAsync(companyId, "En Progreso");
 
         using HttpClient client = await _factory.CreateClientForRoleAsync(Roles.Administrador);
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = technicianId, Priority = TicketPriority.Alta, StatusId = enProgresoId });
+            new { AssignedToId = technicianId, Priority = TicketPriority.Alta });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         TicketDto? ticket = await response.Content.ReadFromJsonAsync<TicketDto>();
         Assert.NotNull(ticket);
         Assert.Equal(technicianId, ticket.AssignedToId);
         Assert.Equal(TicketPriority.Alta, ticket.Priority);
-        Assert.Equal(enProgresoId, ticket.StatusId);
-        Assert.Equal("En Progreso", ticket.StatusName);
-    }
-
-    [Fact]
-    public async Task Update_SetsResolvedAtUtc_WhenStatusIsClosed()
-    {
-        await _factory.ResetTicketsAsync();
-        (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
-        Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket E", "Para resolver");
-        Guid resueltoId = await _factory.GetStatusIdAsync(companyId, "Resuelto");
-
-        using HttpClient client = await _factory.CreateClientForRoleAsync(Roles.Administrador);
-
-        HttpResponseMessage response = await client.PatchAsJsonAsync(
-            $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = technicianId, Priority = TicketPriority.Media, StatusId = resueltoId });
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.NotNull(await _factory.GetResolvedAtUtcAsync(ticketId));
-    }
-
-    [Fact]
-    public async Task Update_ClearsResolvedAtUtc_WhenStatusIsReopened()
-    {
-        await _factory.ResetTicketsAsync();
-        (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
-        Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket F", "Para reabrir");
-        Guid resueltoId = await _factory.GetStatusIdAsync(companyId, "Resuelto");
-        Guid nuevoId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
-
-        using HttpClient client = await _factory.CreateClientForRoleAsync(Roles.Administrador);
-
-        await client.PatchAsJsonAsync(
-            $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = technicianId, Priority = TicketPriority.Media, StatusId = resueltoId });
-
-        HttpResponseMessage response = await client.PatchAsJsonAsync(
-            $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = technicianId, Priority = TicketPriority.Media, StatusId = nuevoId });
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Null(await _factory.GetResolvedAtUtcAsync(ticketId));
     }
 
     [Fact]
@@ -266,7 +222,7 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{Guid.NewGuid()}",
-            new { AssignedToId = technicianId, Priority = TicketPriority.Media, StatusId = (await GetSeedCompanyCatalogAsync()).StatusId });
+            new { AssignedToId = technicianId, Priority = TicketPriority.Media });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -282,7 +238,7 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = adminId, Priority = TicketPriority.Media, StatusId = (await GetSeedCompanyCatalogAsync()).StatusId });
+            new { AssignedToId = adminId, Priority = TicketPriority.Media });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("AssignedToId", await GetValidationErrorsAsync(response));
@@ -306,7 +262,7 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = otherTechnicianId, Priority = TicketPriority.Media, StatusId = (await GetSeedCompanyCatalogAsync()).StatusId });
+            new { AssignedToId = otherTechnicianId, Priority = TicketPriority.Media });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("AssignedToId", await GetValidationErrorsAsync(response));
@@ -330,46 +286,41 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = inactiveTechnicianId, Priority = TicketPriority.Media, StatusId = (await GetSeedCompanyCatalogAsync()).StatusId });
+            new { AssignedToId = inactiveTechnicianId, Priority = TicketPriority.Media });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("AssignedToId", await GetValidationErrorsAsync(response));
     }
 
     [Fact]
-    public async Task Update_Returns400_WhenStatusDoesNotExist()
+    public async Task Update_Returns400_WhenNoFieldsProvided()
     {
         await _factory.ResetTicketsAsync();
-        (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
-        Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket K", "Estado inválido");
+        Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket L", "Sin campos");
 
         using HttpClient client = await _factory.CreateClientForRoleAsync(Roles.Administrador);
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = technicianId, Priority = TicketPriority.Media, StatusId = Guid.NewGuid() });
+            new { });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("StatusId", await GetValidationErrorsAsync(response));
     }
 
     [Fact]
-    public async Task Update_Returns400_WhenRequiredFieldsAreEmpty()
+    public async Task Update_Returns400_WhenInvalidPriority()
     {
         await _factory.ResetTicketsAsync();
-        Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket L", "Campos vacíos");
+        Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket N", "Prioridad inválida");
 
         using HttpClient client = await _factory.CreateClientForRoleAsync(Roles.Administrador);
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = Guid.Empty, Priority = (TicketPriority)99, StatusId = Guid.Empty });
+            new { Priority = 99 });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        IReadOnlyCollection<string> errors = await GetValidationErrorsAsync(response);
-        Assert.Contains("AssignedToId", errors);
-        Assert.Contains("Priority", errors);
-        Assert.Contains("StatusId", errors);
+        Assert.Contains("Priority", await GetValidationErrorsAsync(response));
     }
 
     [Fact]
@@ -382,9 +333,45 @@ public sealed class AdminTicketsEndpointTests
 
         HttpResponseMessage response = await client.PatchAsJsonAsync(
             $"/api/admin/tickets/{ticketId}",
-            new { AssignedToId = Guid.NewGuid(), Priority = TicketPriority.Media, StatusId = Guid.NewGuid() });
+            new { AssignedToId = Guid.NewGuid(), Priority = TicketPriority.Media });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Assign_Returns200_AndSetsTechnician()
+    {
+        await _factory.ResetTicketsAsync();
+        (_, _, Guid technicianId, _) = await GetSeedAsync();
+        Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket P", "Para asignar");
+
+        using HttpClient client = await _factory.CreateClientForRoleAsync(Roles.Administrador);
+
+        HttpResponseMessage response = await client.PatchAsJsonAsync(
+            $"/api/admin/tickets/{ticketId}/assign",
+            new { AssignedToId = technicianId });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        TicketDto? ticket = await response.Content.ReadFromJsonAsync<TicketDto>();
+        Assert.NotNull(ticket);
+        Assert.Equal(technicianId, ticket.AssignedToId);
+        Assert.Equal("En Espera", ticket.StatusName);
+    }
+
+    [Fact]
+    public async Task Assign_Returns400_WhenAssignedToIdIsEmpty()
+    {
+        await _factory.ResetTicketsAsync();
+        Guid ticketId = await CreateSeedCompanyTicketAsync("Ticket Q", "ID vacío");
+
+        using HttpClient client = await _factory.CreateClientForRoleAsync(Roles.Administrador);
+
+        HttpResponseMessage response = await client.PatchAsJsonAsync(
+            $"/api/admin/tickets/{ticketId}/assign",
+            new { AssignedToId = Guid.Empty });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("AssignedToId", await GetValidationErrorsAsync(response));
     }
 
     private async Task<(Guid CompanyId, Guid AdminId, Guid TechnicianId, Guid ClientId)> GetSeedAsync()
@@ -394,12 +381,6 @@ public sealed class AdminTicketsEndpointTests
         Guid technicianId = await _factory.GetUserIdByEmailAsync(CustomWebApplicationFactory.TechnicianEmail);
         Guid clientId = await _factory.GetUserIdByEmailAsync(CustomWebApplicationFactory.ClientEmail);
         return (companyId, adminId, technicianId, clientId);
-    }
-
-    private async Task<(Guid CategoryId, Guid StatusId)> GetSeedCompanyCatalogAsync()
-    {
-        Guid companyId = await _factory.GetCompanyIdAsync(CustomWebApplicationFactory.SeedCompanyName);
-        return await GetCatalogAsync(companyId);
     }
 
     private async Task<(Guid CategoryId, Guid StatusId)> GetCatalogAsync(Guid companyId)

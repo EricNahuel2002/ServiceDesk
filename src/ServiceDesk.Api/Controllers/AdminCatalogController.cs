@@ -49,36 +49,4 @@ public sealed class AdminCatalogController : ControllerBase
         CategoryDto category = await _catalogService.UpdateCategoryAsync(id, request, cancellationToken);
         return Ok(category);
     }
-
-    [HttpGet("statuses")]
-    [ProducesResponseType(typeof(IReadOnlyList<StatusDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<StatusDto>>> GetStatuses(CancellationToken cancellationToken)
-    {
-        IReadOnlyList<StatusDto> statuses = await _catalogService.GetAllStatusesAsync(cancellationToken);
-        return Ok(statuses);
-    }
-
-    [HttpPost("statuses")]
-    [ProducesResponseType(typeof(StatusDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<StatusDto>> CreateStatus(
-        CreateStatusRequest request,
-        CancellationToken cancellationToken)
-    {
-        StatusDto status = await _catalogService.CreateStatusAsync(request, cancellationToken);
-        return CreatedAtAction(nameof(GetStatuses), new { }, status);
-    }
-
-    [HttpPut("statuses/{id:guid}")]
-    [ProducesResponseType(typeof(StatusDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<StatusDto>> UpdateStatus(
-        Guid id,
-        UpdateStatusRequest request,
-        CancellationToken cancellationToken)
-    {
-        StatusDto status = await _catalogService.UpdateStatusAsync(id, request, cancellationToken);
-        return Ok(status);
-    }
 }

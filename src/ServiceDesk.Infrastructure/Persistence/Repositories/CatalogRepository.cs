@@ -99,11 +99,6 @@ public sealed class CatalogRepository : ICatalogRepository
         await _context.Categories.AddAsync(category, cancellationToken);
     }
 
-    public async Task AddStatusAsync(Status status, CancellationToken cancellationToken = default)
-    {
-        await _context.Statuses.AddAsync(status, cancellationToken);
-    }
-
     public async Task<bool> CategoryNameExistsAsync(
         Guid companyId,
         string name,
@@ -112,15 +107,5 @@ public sealed class CatalogRepository : ICatalogRepository
         await _context.Categories
             .AnyAsync(
                 c => c.CompanyId == companyId && c.Name == name && (excludeId == null || c.Id != excludeId.Value),
-                cancellationToken);
-
-    public async Task<bool> StatusNameExistsAsync(
-        Guid companyId,
-        string name,
-        Guid? excludeId = null,
-        CancellationToken cancellationToken = default) =>
-        await _context.Statuses
-            .AnyAsync(
-                s => s.CompanyId == companyId && s.Name == name && (excludeId == null || s.Id != excludeId.Value),
                 cancellationToken);
 }

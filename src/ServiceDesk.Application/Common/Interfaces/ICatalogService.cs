@@ -15,8 +15,4 @@ public interface ICatalogService
     Task<CategoryDto> CreateCategoryAsync(CreateCategoryRequest request, CancellationToken cancellationToken = default);
 
     Task<CategoryDto> UpdateCategoryAsync(Guid id, UpdateCategoryRequest request, CancellationToken cancellationToken = default);
-
-    Task<StatusDto> CreateStatusAsync(CreateStatusRequest request, CancellationToken cancellationToken = default);
-
-    Task<StatusDto> UpdateStatusAsync(Guid id, UpdateStatusRequest request, CancellationToken cancellationToken = default);
 }

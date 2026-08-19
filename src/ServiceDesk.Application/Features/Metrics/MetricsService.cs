@@ -58,7 +58,7 @@ public sealed class MetricsService : IMetricsService
                 Count = g.Count(),
                 OverdueCount = g.Count(IsOverdue)
             })
-            .OrderByDescending(x => (int)x.Priority)
+            .OrderByDescending(x => (int?)x.Priority ?? 0)
             .ToList();
 
         IReadOnlyList<DailyMetricDto> trend = GroupTrend(tickets, period);

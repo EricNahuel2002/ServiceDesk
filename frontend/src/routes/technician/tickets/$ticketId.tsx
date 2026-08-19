@@ -70,6 +70,8 @@ function TechnicianTicketDetailPage() {
           <SlaCountdownTimer
             responseDeadlineAtUtc={t.responseDeadlineAtUtc}
             startedWorkAtUtc={t.startedWorkAtUtc}
+            assignedAtUtc={t.assignedAtUtc}
+            delayMinutes={t.delayMinutes}
           />
         )}
 

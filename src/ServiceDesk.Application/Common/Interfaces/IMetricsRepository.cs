@@ -15,7 +15,7 @@ public interface IMetricsRepository
 public sealed record TicketMetricsRecord
 {
     public Guid Id { get; init; }
-    public TicketPriority Priority { get; init; }
+    public TicketPriority? Priority { get; init; }
     public Guid StatusId { get; init; }
     public bool StatusIsClosed { get; init; }
     public string StatusName { get; init; } = string.Empty;

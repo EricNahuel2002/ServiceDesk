@@ -15,25 +15,19 @@ public sealed class CatalogService : ICatalogService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IValidator<CreateCategoryRequest> _createCategoryValidator;
     private readonly IValidator<UpdateCategoryRequest> _updateCategoryValidator;
-    private readonly IValidator<CreateStatusRequest> _createStatusValidator;
-    private readonly IValidator<UpdateStatusRequest> _updateStatusValidator;
 
     public CatalogService(
         ICatalogRepository catalog,
         ICurrentUserService currentUser,
         IUnitOfWork unitOfWork,
         IValidator<CreateCategoryRequest> createCategoryValidator,
-        IValidator<UpdateCategoryRequest> updateCategoryValidator,
-        IValidator<CreateStatusRequest> createStatusValidator,
-        IValidator<UpdateStatusRequest> updateStatusValidator)
+        IValidator<UpdateCategoryRequest> updateCategoryValidator)
     {
         _catalog = catalog;
         _currentUser = currentUser;
         _unitOfWork = unitOfWork;
         _createCategoryValidator = createCategoryValidator;
         _updateCategoryValidator = updateCategoryValidator;
-        _createStatusValidator = createStatusValidator;
-        _updateStatusValidator = updateStatusValidator;
     }
 
     public Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken) =>
@@ -97,60 +91,5 @@ public sealed class CatalogService : ICatalogService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new CategoryDto { Id = category.Id, Name = category.Name, IsActive = category.IsActive };
-    }
-
-    public async Task<StatusDto> CreateStatusAsync(CreateStatusRequest request, CancellationToken cancellationToken)
-    {
-        await ValidationHelper.ValidateAsync(_createStatusValidator, request, cancellationToken);
-
-        if (await _catalog.StatusNameExistsAsync(_currentUser.CompanyId, request.Name, cancellationToken: cancellationToken))
-        {
-            throw new ValidationException(new Dictionary<string, string[]>
-            {
-                { "Name", ["Ya existe un estado con ese nombre."] }
-            });
-        }
-
-        Status status = new()
-        {
-            CompanyId = _currentUser.CompanyId,
-            Name = request.Name,
-            SortOrder = request.SortOrder,
-            IsClosed = request.IsClosed
-        };
-
-        await _catalog.AddStatusAsync(status, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return new StatusDto { Id = status.Id, Name = status.Name, SortOrder = status.SortOrder, IsClosed = status.IsClosed, IsActive = status.IsActive };
-    }
-
-    public async Task<StatusDto> UpdateStatusAsync(Guid id, UpdateStatusRequest request, CancellationToken cancellationToken)
-    {
-        await ValidationHelper.ValidateAsync(_updateStatusValidator, request, cancellationToken);
-
-        Status? status = await _catalog.GetStatusByIdAsync(id, cancellationToken);
-
-        if (status is null)
-        {
-            throw new NotFoundException($"El estado con id {id} no existe.");
-        }
-
-        if (await _catalog.StatusNameExistsAsync(_currentUser.CompanyId, request.Name, id, cancellationToken))
-        {
-            throw new ValidationException(new Dictionary<string, string[]>
-            {
-                { "Name", ["Ya existe un estado con ese nombre."] }
-            });
-        }
-
-        status.Name = request.Name;
-        status.SortOrder = request.SortOrder;
-        status.IsClosed = request.IsClosed;
-        status.IsActive = request.IsActive;
-
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return new StatusDto { Id = status.Id, Name = status.Name, SortOrder = status.SortOrder, IsClosed = status.IsClosed, IsActive = status.IsActive };
     }
 }

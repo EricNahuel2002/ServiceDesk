@@ -16,7 +16,7 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             .IsRequired();
 
         builder.Property(t => t.Priority)
-            .HasConversion<int>();
+            .HasConversion<int?>();
 
         builder.HasIndex(t => t.CompanyId);
         builder.HasIndex(t => t.CategoryId);

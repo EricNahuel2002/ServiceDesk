@@ -19,7 +19,7 @@ public sealed record AdminMetricsDto
 
 public sealed record PriorityMetricDto
 {
-    public TicketPriority Priority { get; init; }
+    public TicketPriority? Priority { get; init; }
     public int Count { get; init; }
     public int OverdueCount { get; init; }
 }

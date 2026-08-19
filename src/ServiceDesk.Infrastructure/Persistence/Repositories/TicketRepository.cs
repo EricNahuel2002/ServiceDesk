@@ -29,6 +29,9 @@ public sealed class TicketRepository : ITicketRepository
         UpdatedAtUtc = ticket.UpdatedAtUtc.HasValue
             ? DateTime.SpecifyKind(ticket.UpdatedAtUtc.Value, DateTimeKind.Utc)
             : null,
+        AssignedAtUtc = ticket.AssignedAtUtc.HasValue
+            ? DateTime.SpecifyKind(ticket.AssignedAtUtc.Value, DateTimeKind.Utc)
+            : null,
         ResponseDeadlineAtUtc = DateTime.SpecifyKind(ticket.ResponseDeadlineAtUtc, DateTimeKind.Utc),
         StartedWorkAtUtc = ticket.StartedWorkAtUtc.HasValue
             ? DateTime.SpecifyKind(ticket.StartedWorkAtUtc.Value, DateTimeKind.Utc)
@@ -115,7 +118,7 @@ public sealed class TicketRepository : ITicketRepository
                 TicketId = ticket.Id,
                 Title = ticket.Title,
                 Description = ticket.Description,
-                PriorityName = ticket.Priority.ToString(),
+                PriorityName = ticket.Priority != null ? ticket.Priority.ToString()! : "Sin asignar",
                 AssignedToFirstName = ticket.AssignedTo!.FirstName,
                 AssignedToLastName = ticket.AssignedTo!.LastName,
                 AssignedToEmail = ticket.AssignedTo!.Email ?? string.Empty,

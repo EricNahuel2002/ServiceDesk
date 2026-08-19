@@ -14,11 +14,13 @@ export const PRIORITY_LABELS: Record<TicketPriorityValue, string> = {
   [TicketPriority.Critica]: 'Crítica',
 }
 
-export function getPriorityLabel(priority: number): string {
+export function getPriorityLabel(priority: number | null): string {
+  if (priority === null) return 'Sin asignar'
   return PRIORITY_LABELS[priority as TicketPriorityValue] ?? `Prioridad ${priority}`
 }
 
-export function getPriorityBadgeColor(priority: number): 'red' | 'amber' | 'green' | 'gray' {
+export function getPriorityBadgeColor(priority: number | null): 'red' | 'amber' | 'green' | 'gray' {
+  if (priority === null) return 'gray'
   switch (priority) {
     case TicketPriority.Critica:
     case TicketPriority.Alta:

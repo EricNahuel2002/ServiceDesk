@@ -16,7 +16,7 @@ public sealed record TicketDto
 
     public string CategoryName { get; init; } = string.Empty;
 
-    public TicketPriority Priority { get; init; }
+    public TicketPriority? Priority { get; init; }
 
     public Guid StatusId { get; init; }
 
@@ -38,11 +38,17 @@ public sealed record TicketDto
 
     public DateTime ResponseDeadlineAtUtc { get; init; }
 
+    public DateTime? AssignedAtUtc { get; init; }
+
     public DateTime? StartedWorkAtUtc { get; init; }
 
     public DateTime? ResolvedAtUtc { get; init; }
 
     public int SlaLimitHours { get; init; }
+
+    public int DelayMinutes { get; init; }
+
+    public decimal EffectiveSlaLimitHours { get; init; }
 
     public decimal SlaPercentageElapsed { get; init; }
 

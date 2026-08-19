@@ -7,11 +7,11 @@ import { Button } from '../../../components/common/Button'
 import { AdminAppShell } from '../../../components/layout/AdminAppShell'
 import { useAdminTicket, useTechnicians, useUpdateTicket } from '../../../features/admin/queries'
 import { requireAdmin } from '../../../features/admin/auth'
-import { useStatuses } from '../../../features/catalog/queries'
 import { formatDate } from '../../../utils/format'
 import { getPriorityLabel, getPriorityBadgeColor } from '../../../utils/priority'
 import { getStatusBadgeColor } from '../../../utils/status'
 import { SlaProgressBar } from '../../../components/common/SlaProgressBar'
+import { SlaDelayBar } from '../../../components/common/SlaDelayBar'
 
 export const Route = createFileRoute('/admin/tickets/$ticketId')({
   beforeLoad: () => requireAdmin(),
@@ -22,7 +22,6 @@ function AdminTicketDetailPage() {
   const { ticketId } = Route.useParams()
   const ticket = useAdminTicket(ticketId)
   const technicians = useTechnicians()
-  const statuses = useStatuses()
   const updateTicket = useUpdateTicket()
 
   const initialValues = useMemo(
@@ -31,34 +30,38 @@ function AdminTicketDetailPage() {
         ? {
             assignedToId: ticket.data.assignedToId ?? '',
             priority: ticket.data.priority,
-            statusId: ticket.data.statusId,
           }
         : undefined,
     [ticket.data],
   )
 
-  const [overrides, setOverrides] = useState<Record<string, string | number>>({})
+  const [overrides, setOverrides] = useState<Record<string, string | number | null>>({})
 
   const assignedToId = (overrides.assignedToId as string) ?? initialValues?.assignedToId ?? ''
-  const priority = (overrides.priority as number) ?? initialValues?.priority ?? 2
-  const statusId = (overrides.statusId as string) ?? initialValues?.statusId ?? ''
+  const priority = (overrides.priority as number | null) ?? initialValues?.priority ?? null
 
   const hasChanges = Boolean(initialValues) && (
     assignedToId !== initialValues!.assignedToId ||
-    priority !== initialValues!.priority ||
-    statusId !== initialValues!.statusId
+    priority !== initialValues!.priority
   )
 
-  function handleFieldChange(field: string, value: string | number) {
+  function handleFieldChange(field: string, value: string | number | null) {
     setOverrides((prev) => ({ ...prev, [field]: value }))
   }
 
   function handleSave() {
     if (!hasChanges) return
-    updateTicket.mutate({
-      id: ticketId,
-      data: { assignedToId, priority, statusId },
-    })
+
+    const data: Record<string, string | number | null> = {}
+
+    if (assignedToId !== initialValues!.assignedToId) {
+      data.assignedToId = assignedToId || null
+    }
+    if (priority !== initialValues!.priority) {
+      data.priority = priority
+    }
+
+    updateTicket.mutate({ id: ticketId, data })
   }
 
   if (ticket.isPending) {
@@ -78,6 +81,7 @@ function AdminTicketDetailPage() {
   }
 
   const t = ticket.data
+  const isResolved = t.statusName === 'Resuelto'
 
   return (
     <AdminAppShell>
@@ -177,30 +181,45 @@ function AdminTicketDetailPage() {
             </div>
           </Card>
 
-          <Card>
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Estado SLA</h2>
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Límite de respuesta
-                  </span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {t.slaLimitHours}h
-                  </span>
+          {t.assignedAtUtc && (
+            <Card>
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">Estado SLA</h2>
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Límite de respuesta
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {t.slaLimitHours}h
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Fecha límite
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatDate(t.responseDeadlineAtUtc)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1.5">
                   <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Fecha límite
+                    Progreso
                   </span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {formatDate(t.responseDeadlineAtUtc)}
-                  </span>
+                  <SlaProgressBar
+                    percentageElapsed={t.resolvedAtUtc ? 100 : t.slaPercentageElapsed}
+                    isOverdue={t.isOverdue}
+                  />
                 </div>
+                <SlaDelayBar
+                  assignedAtUtc={t.assignedAtUtc}
+                  startedWorkAtUtc={t.startedWorkAtUtc}
+                  delayMinutes={t.delayMinutes}
+                />
               </div>
-              <SlaProgressBar percentageElapsed={t.slaPercentageElapsed} isOverdue={t.isOverdue} />
-            </div>
-          </Card>
+            </Card>
+          )}
 
           {t.attachments.length > 0 && (
             <Card>
@@ -222,64 +241,53 @@ function AdminTicketDetailPage() {
           )}
         </div>
 
-        <div className="flex flex-col gap-6">
-          <Card>
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Asignar valores</h2>
-            <div className="flex flex-col gap-4">
-              <Select
-                label="Técnico"
-                value={assignedToId}
-                onChange={(e) => handleFieldChange('assignedToId', e.target.value)}
-              >
-                <option value="">Sin asignar</option>
-                {technicians.data?.map((tech) => (
-                  <option key={tech.id} value={tech.id}>
-                    {tech.firstName} {tech.lastName}
-                  </option>
-                ))}
-              </Select>
-
-              <Select
-                label="Prioridad"
-                value={priority}
-                onChange={(e) => handleFieldChange('priority', Number(e.target.value))}
-              >
-                <option value={1}>Baja</option>
-                <option value={2}>Media</option>
-                <option value={3}>Alta</option>
-                <option value={4}>Crítica</option>
-              </Select>
-
-              <Select
-                label="Estado"
-                value={statusId}
-                onChange={(e) => handleFieldChange('statusId', e.target.value)}
-              >
-                {statuses.data
-                  ?.filter((s) => s.isActive)
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
+        {!isResolved && (
+          <div className="flex flex-col gap-6">
+            <Card>
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">Asignar valores</h2>
+              <div className="flex flex-col gap-4">
+                <Select
+                  label="Técnico"
+                  value={assignedToId}
+                  onChange={(e) => handleFieldChange('assignedToId', e.target.value)}
+                >
+                  <option value="">Sin asignar</option>
+                  {technicians.data?.map((tech) => (
+                    <option key={tech.id} value={tech.id}>
+                      {tech.firstName} {tech.lastName}
                     </option>
                   ))}
-              </Select>
+                </Select>
 
-              <Button
-                disabled={!hasChanges || updateTicket.isPending}
-                onClick={handleSave}
-              >
-                {updateTicket.isPending ? 'Guardando...' : 'Guardar cambios'}
-              </Button>
+                <Select
+                  label="Prioridad"
+                  value={priority ?? ''}
+                  onChange={(e) => handleFieldChange('priority', e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Sin asignar</option>
+                  <option value={1}>Baja</option>
+                  <option value={2}>Media</option>
+                  <option value={3}>Alta</option>
+                  <option value={4}>Crítica</option>
+                </Select>
 
-              {updateTicket.isSuccess && (
-                <p className="text-sm text-green-600">Cambios guardados correctamente.</p>
-              )}
-              {updateTicket.isError && (
-                <p className="text-sm text-red-600">Error al guardar los cambios.</p>
-              )}
-            </div>
-          </Card>
-        </div>
+                <Button
+                  disabled={!hasChanges || updateTicket.isPending}
+                  onClick={handleSave}
+                >
+                  {updateTicket.isPending ? 'Guardando...' : 'Guardar cambios'}
+                </Button>
+
+                {updateTicket.isSuccess && (
+                  <p className="text-sm text-green-600">Cambios guardados correctamente.</p>
+                )}
+                {updateTicket.isError && (
+                  <p className="text-sm text-red-600">Error al guardar los cambios.</p>
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
     </AdminAppShell>
   )

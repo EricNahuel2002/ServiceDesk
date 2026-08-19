@@ -6,22 +6,18 @@ import {
   getTicketById,
   getTechnicians,
   updateTicket,
+  assignTicket,
   getAllCategories,
   createCategory,
   updateCategory,
-  getAllStatuses,
-  createStatus,
-  updateStatus,
   getAllUsers,
   createUser,
   getMetrics,
 } from './api'
-import type { TicketDto, UpdateTicketRequest } from '../tickets/types'
+import type { TicketDto, UpdateTicketRequest, AssignTicketRequest } from '../tickets/types'
 import type {
   CreateCategoryRequest,
   UpdateCategoryRequest,
-  CreateStatusRequest,
-  UpdateStatusRequest,
   CreateUserRequest,
 } from './types'
 
@@ -54,6 +50,19 @@ export function useUpdateTicket() {
   })
 }
 
+export function useAssignTicket() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: AssignTicketRequest }) =>
+      assignTicket(id, data),
+    onSuccess: (_result, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'tickets'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'tickets', variables.id] })
+    },
+  })
+}
+
 export function useIsTicketClosed() {
   const statuses = useStatuses()
 
@@ -79,10 +88,6 @@ export function useAdminCategories() {
   return useQuery({ queryKey: ['admin', 'categories'], queryFn: getAllCategories })
 }
 
-export function useAdminStatuses() {
-  return useQuery({ queryKey: ['admin', 'statuses'], queryFn: getAllStatuses })
-}
-
 export function useCreateCategory() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -100,27 +105,6 @@ export function useUpdateCategory() {
       updateCategory(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'categories'] })
-    },
-  })
-}
-
-export function useCreateStatus() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (data: CreateStatusRequest) => createStatus(data),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'statuses'] })
-    },
-  })
-}
-
-export function useUpdateStatus() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateStatusRequest }) =>
-      updateStatus(id, data),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'statuses'] })
     },
   })
 }

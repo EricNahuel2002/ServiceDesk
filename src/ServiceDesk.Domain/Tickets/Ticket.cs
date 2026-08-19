@@ -16,7 +16,7 @@ public class Ticket : BaseEntity
 
     public Guid CategoryId { get; set; }
 
-    public TicketPriority Priority { get; set; }
+    public TicketPriority? Priority { get; set; }
 
     public Guid StatusId { get; set; }
 
@@ -27,6 +27,8 @@ public class Ticket : BaseEntity
     public DateTime ResponseDeadlineAtUtc { get; set; }
 
     public DateTime? StartedWorkAtUtc { get; set; }
+
+    public DateTime? AssignedAtUtc { get; set; }
 
     public DateTime? ResolvedAtUtc { get; set; }
 

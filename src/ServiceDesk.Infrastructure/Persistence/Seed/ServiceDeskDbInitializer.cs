@@ -43,6 +43,10 @@ public sealed class ServiceDeskDbInitializer
             await SeedCompanyAsync(cancellationToken);
         }
 
+        await EnsureSlaConfigurationsAsync(cancellationToken);
+
+        await EnsureBusinessHoursAsync(cancellationToken);
+
         await SeedDemoUsersAsync(cancellationToken);
 
         await SeedDemoTicketsAsync(cancellationToken);
@@ -107,6 +111,67 @@ public sealed class ServiceDeskDbInitializer
         _context.CompanyBusinessHours.Add(new CompanyBusinessHours
         {
             CompanyId = company.Id,
+            TimeZoneId = "Argentina Standard Time",
+            BusinessHoursJson = businessHoursJson,
+            UseBusinessHours = true
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureSlaConfigurationsAsync(CancellationToken cancellationToken)
+    {
+        Guid companyId = await _context.Companies
+            .OrderBy(c => c.CreatedAtUtc)
+            .Select(c => c.Id)
+            .FirstAsync(cancellationToken);
+
+        bool hasSlaConfigs = await _context.SlaConfigurations
+            .AnyAsync(s => s.CompanyId == companyId, cancellationToken);
+
+        if (hasSlaConfigs)
+        {
+            return;
+        }
+
+        _context.SlaConfigurations.AddRange(
+            new SlaConfiguration { CompanyId = companyId, Priority = TicketPriority.Baja, ResponseTimeHours = 8 },
+            new SlaConfiguration { CompanyId = companyId, Priority = TicketPriority.Media, ResponseTimeHours = 4 },
+            new SlaConfiguration { CompanyId = companyId, Priority = TicketPriority.Alta, ResponseTimeHours = 2 },
+            new SlaConfiguration { CompanyId = companyId, Priority = TicketPriority.Critica, ResponseTimeHours = 1 });
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureBusinessHoursAsync(CancellationToken cancellationToken)
+    {
+        Guid companyId = await _context.Companies
+            .OrderBy(c => c.CreatedAtUtc)
+            .Select(c => c.Id)
+            .FirstAsync(cancellationToken);
+
+        bool hasBusinessHours = await _context.CompanyBusinessHours
+            .AnyAsync(b => b.CompanyId == companyId, cancellationToken);
+
+        if (hasBusinessHours)
+        {
+            return;
+        }
+
+        string businessHoursJson = JsonSerializer.Serialize(new Dictionary<string, DaySchedule>
+        {
+            ["Monday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Tuesday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Wednesday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Thursday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Friday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Saturday"] = new() { Enabled = false },
+            ["Sunday"] = new() { Enabled = false }
+        });
+
+        _context.CompanyBusinessHours.Add(new CompanyBusinessHours
+        {
+            CompanyId = companyId,
             TimeZoneId = "Argentina Standard Time",
             BusinessHoursJson = businessHoursJson,
             UseBusinessHours = true
@@ -203,7 +268,7 @@ public sealed class ServiceDeskDbInitializer
                 company.Id,
                 cliente.Id,
                 hardwareId,
-                TicketPriority.Media,
+                null,
                 nuevoId,
                 "PC no enciende",
                 "La PC de recepción no enciende desde esta mañana.",
@@ -217,6 +282,7 @@ public sealed class ServiceDeskDbInitializer
                 "VPN no funciona",
                 "No puedo conectarme a la VPN desde casa.",
                 assignedToId: tecnico.Id,
+                assignedAtUtc: now.AddHours(-1),
                 responseDeadline: now.AddHours(2),
                 startedWorkAt: now.AddMinutes(-30)),
             CreateTicket(
@@ -228,6 +294,7 @@ public sealed class ServiceDeskDbInitializer
                 "Impresora no imprime",
                 "La impresora del piso 3 quedó con un atasco de papel.",
                 assignedToId: tecnico.Id,
+                assignedAtUtc: now.AddHours(-2),
                 resolved: true,
                 responseDeadline: now.AddHours(4),
                 startedWorkAt: now.AddMinutes(-60)),
@@ -235,7 +302,7 @@ public sealed class ServiceDeskDbInitializer
                 company.Id,
                 cliente.Id,
                 softwareId,
-                TicketPriority.Baja,
+                null,
                 nuevoId,
                 "Solicitud de licencia",
                 "Necesito una licencia de Microsoft 365 para el equipo de ventas.",
@@ -281,12 +348,13 @@ public sealed class ServiceDeskDbInitializer
         Guid companyId,
         Guid createdById,
         Guid categoryId,
-        TicketPriority priority,
+        TicketPriority? priority,
         Guid statusId,
         string title,
         string description,
         DateTime responseDeadline,
         Guid? assignedToId = null,
+        DateTime? assignedAtUtc = null,
         bool resolved = false,
         DateTime? startedWorkAt = null) =>
         new()
@@ -300,6 +368,7 @@ public sealed class ServiceDeskDbInitializer
             Title = title,
             Description = description,
             AssignedToId = assignedToId,
+            AssignedAtUtc = assignedAtUtc,
             ResponseDeadlineAtUtc = responseDeadline,
             StartedWorkAtUtc = startedWorkAt,
             ResolvedAtUtc = resolved ? DateTime.UtcNow : null
