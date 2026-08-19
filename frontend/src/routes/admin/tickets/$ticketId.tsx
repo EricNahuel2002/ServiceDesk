@@ -7,43 +7,21 @@ import { Button } from '../../../components/common/Button'
 import { AdminAppShell } from '../../../components/layout/AdminAppShell'
 import { useAdminTicket, useTechnicians, useUpdateTicket } from '../../../features/admin/queries'
 import { requireAdmin } from '../../../features/admin/auth'
-import { usePriorities, useStatuses } from '../../../features/catalog/queries'
+import { useStatuses } from '../../../features/catalog/queries'
 import { formatDate } from '../../../utils/format'
+import { getPriorityLabel, getPriorityBadgeColor } from '../../../utils/priority'
+import { getStatusBadgeColor } from '../../../utils/status'
+import { SlaProgressBar } from '../../../components/common/SlaProgressBar'
 
 export const Route = createFileRoute('/admin/tickets/$ticketId')({
   beforeLoad: () => requireAdmin(),
   component: AdminTicketDetailPage,
 })
 
-function getStatusBadgeColor(statusName: string): 'blue' | 'amber' | 'green' | 'red' | 'gray' {
-  const lower = statusName.toLowerCase()
-  if (lower.includes('nuevo') || lower.includes('abierto') || lower.includes('new') || lower.includes('open'))
-    return 'blue'
-  if (lower.includes('progreso') || lower.includes('asignad') || lower.includes('progress') || lower.includes('assigned'))
-    return 'amber'
-  if (lower.includes('resuelto') || lower.includes('finalizado') || lower.includes('closed') || lower.includes('resolved'))
-    return 'green'
-  if (lower.includes('cancelado') || lower.includes('cerrado') || lower.includes('cancelled') || lower.includes('canceled'))
-    return 'red'
-  return 'gray'
-}
-
-function getPriorityBadgeColor(priorityName: string): 'red' | 'amber' | 'green' | 'gray' {
-  const lower = priorityName.toLowerCase()
-  if (lower.includes('alta') || lower.includes('high') || lower.includes('urgente'))
-    return 'red'
-  if (lower.includes('media') || lower.includes('medium') || lower.includes('normal'))
-    return 'amber'
-  if (lower.includes('baja') || lower.includes('low'))
-    return 'green'
-  return 'gray'
-}
-
 function AdminTicketDetailPage() {
   const { ticketId } = Route.useParams()
   const ticket = useAdminTicket(ticketId)
   const technicians = useTechnicians()
-  const priorities = usePriorities()
   const statuses = useStatuses()
   const updateTicket = useUpdateTicket()
 
@@ -52,26 +30,26 @@ function AdminTicketDetailPage() {
       ticket.data
         ? {
             assignedToId: ticket.data.assignedToId ?? '',
-            priorityId: ticket.data.priorityId,
+            priority: ticket.data.priority,
             statusId: ticket.data.statusId,
           }
         : undefined,
     [ticket.data],
   )
 
-  const [overrides, setOverrides] = useState<Record<string, string>>({})
+  const [overrides, setOverrides] = useState<Record<string, string | number>>({})
 
-  const assignedToId = overrides.assignedToId ?? initialValues?.assignedToId ?? ''
-  const priorityId = overrides.priorityId ?? initialValues?.priorityId ?? ''
-  const statusId = overrides.statusId ?? initialValues?.statusId ?? ''
+  const assignedToId = (overrides.assignedToId as string) ?? initialValues?.assignedToId ?? ''
+  const priority = (overrides.priority as number) ?? initialValues?.priority ?? 2
+  const statusId = (overrides.statusId as string) ?? initialValues?.statusId ?? ''
 
   const hasChanges = Boolean(initialValues) && (
     assignedToId !== initialValues!.assignedToId ||
-    priorityId !== initialValues!.priorityId ||
+    priority !== initialValues!.priority ||
     statusId !== initialValues!.statusId
   )
 
-  function handleFieldChange(field: string, value: string) {
+  function handleFieldChange(field: string, value: string | number) {
     setOverrides((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -79,7 +57,7 @@ function AdminTicketDetailPage() {
     if (!hasChanges) return
     updateTicket.mutate({
       id: ticketId,
-      data: { assignedToId, priorityId, statusId },
+      data: { assignedToId, priority, statusId },
     })
   }
 
@@ -141,7 +119,7 @@ function AdminTicketDetailPage() {
                   <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
                     Prioridad actual
                   </span>
-                  <Badge color={getPriorityBadgeColor(t.priorityName)}>{t.priorityName}</Badge>
+                  <Badge color={getPriorityBadgeColor(t.priority)}>{getPriorityLabel(t.priority)}</Badge>
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -175,7 +153,42 @@ function AdminTicketDetailPage() {
                     </span>
                   </div>
                 )}
+                {t.startedWorkAtUtc && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Inicio de trabajo
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatDate(t.startedWorkAtUtc)}
+                    </span>
+                  </div>
+                )}
               </div>
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">Estado SLA</h2>
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Límite de respuesta
+                  </span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {t.slaLimitHours}h
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Fecha límite
+                  </span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {formatDate(t.responseDeadlineAtUtc)}
+                  </span>
+                </div>
+              </div>
+              <SlaProgressBar percentageElapsed={t.slaPercentageElapsed} isOverdue={t.isOverdue} />
             </div>
           </Card>
 
@@ -218,16 +231,13 @@ function AdminTicketDetailPage() {
 
               <Select
                 label="Prioridad"
-                value={priorityId}
-                onChange={(e) => handleFieldChange('priorityId', e.target.value)}
+                value={priority}
+                onChange={(e) => handleFieldChange('priority', Number(e.target.value))}
               >
-                {priorities.data
-                  ?.filter((p) => p.isActive)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
+                <option value={1}>Baja</option>
+                <option value={2}>Media</option>
+                <option value={3}>Alta</option>
+                <option value={4}>Crítica</option>
               </Select>
 
               <Select

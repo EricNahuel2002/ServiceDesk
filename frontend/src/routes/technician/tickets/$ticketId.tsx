@@ -4,44 +4,24 @@ import { Card } from '../../../components/common/Card'
 import { Badge } from '../../../components/common/Badge'
 import { Button } from '../../../components/common/Button'
 import { TechnicianAppShell } from '../../../components/layout/TechnicianAppShell'
+import { SlaCountdownTimer } from '../../../components/common/SlaCountdownTimer'
 import { useOpenChat } from '../../../features/chat/ChatWidgetContext'
-import { useTechnicianTicket, useResolveTicket, useIsTechnicianTicketClosed } from '../../../features/technician/queries'
+import { useTechnicianTicket, useStartWork, useResolveTicket, useIsTechnicianTicketClosed } from '../../../features/technician/queries'
 import { requireTecnico } from '../../../features/technician/auth'
 import { formatDate } from '../../../utils/format'
+import { getPriorityLabel, getPriorityBadgeColor } from '../../../utils/priority'
+import { getStatusBadgeColor } from '../../../utils/status'
 
 export const Route = createFileRoute('/technician/tickets/$ticketId')({
   beforeLoad: () => requireTecnico(),
   component: TechnicianTicketDetailPage,
 })
 
-function getStatusBadgeColor(statusName: string): 'blue' | 'amber' | 'green' | 'red' | 'gray' {
-  const lower = statusName.toLowerCase()
-  if (lower.includes('nuevo') || lower.includes('abierto') || lower.includes('new') || lower.includes('open'))
-    return 'blue'
-  if (lower.includes('progreso') || lower.includes('asignad') || lower.includes('progress') || lower.includes('assigned'))
-    return 'amber'
-  if (lower.includes('resuelto') || lower.includes('finalizado') || lower.includes('closed') || lower.includes('resolved'))
-    return 'green'
-  if (lower.includes('cancelado') || lower.includes('cerrado') || lower.includes('cancelled') || lower.includes('canceled'))
-    return 'red'
-  return 'gray'
-}
-
-function getPriorityBadgeColor(priorityName: string): 'red' | 'amber' | 'green' | 'gray' {
-  const lower = priorityName.toLowerCase()
-  if (lower.includes('alta') || lower.includes('high') || lower.includes('urgente'))
-    return 'red'
-  if (lower.includes('media') || lower.includes('medium') || lower.includes('normal'))
-    return 'amber'
-  if (lower.includes('baja') || lower.includes('low'))
-    return 'green'
-  return 'gray'
-}
-
 function TechnicianTicketDetailPage() {
   const { ticketId } = Route.useParams()
   const navigate = useNavigate()
   const ticket = useTechnicianTicket(ticketId)
+  const startWork = useStartWork()
   const resolveTicket = useResolveTicket()
   const { isClosed } = useIsTechnicianTicketClosed()
   const openChat = useOpenChat()
@@ -86,6 +66,13 @@ function TechnicianTicketDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">{t.title}</h1>
         </div>
 
+        {!isClosed(t) && (
+          <SlaCountdownTimer
+            responseDeadlineAtUtc={t.responseDeadlineAtUtc}
+            startedWorkAtUtc={t.startedWorkAtUtc}
+          />
+        )}
+
         <Card>
           <div className="flex flex-col gap-4">
             <div>
@@ -115,15 +102,15 @@ function TechnicianTicketDetailPage() {
                   Prioridad
                 </span>
                 <div>
-                  <Badge color={getPriorityBadgeColor(t.priorityName)}>{t.priorityName}</Badge>
+                  <Badge color={getPriorityBadgeColor(t.priority)}>{getPriorityLabel(t.priority)}</Badge>
                 </div>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Solicitante
+                  Límite SLA
                 </span>
                 <span className="text-sm font-medium text-gray-900">
-                  {t.createdById}
+                  {t.slaLimitHours}h
                 </span>
               </div>
             </div>
@@ -137,16 +124,24 @@ function TechnicianTicketDetailPage() {
                   {formatDate(t.createdAtUtc)}
                 </span>
               </div>
-              {t.updatedAtUtc && (
+              {t.startedWorkAtUtc && (
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Actualizado
+                    Inicio de trabajo
                   </span>
                   <span className="text-sm font-medium text-gray-900">
-                    {formatDate(t.updatedAtUtc)}
+                    {formatDate(t.startedWorkAtUtc)}
                   </span>
                 </div>
               )}
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Fecha límite
+                </span>
+                <span className="text-sm font-medium text-gray-900">
+                  {formatDate(t.responseDeadlineAtUtc)}
+                </span>
+              </div>
             </div>
           </div>
         </Card>
@@ -168,7 +163,14 @@ function TechnicianTicketDetailPage() {
         {!isClosed(t) && (
           <Card>
             <h3 className="mb-3 text-sm font-semibold text-gray-900">Acciones</h3>
-            {!showResolveForm ? (
+            {!t.startedWorkAtUtc && !showResolveForm ? (
+              <Button
+                onClick={() => startWork.mutate(ticketId)}
+                disabled={startWork.isPending}
+              >
+                {startWork.isPending ? 'Iniciando...' : 'Iniciar trabajo'}
+              </Button>
+            ) : !showResolveForm ? (
               <Button onClick={() => { setShowResolveForm(true); setError('') }}>
                 Resolver ticket
               </Button>

@@ -140,14 +140,23 @@ public sealed class TicketService : ITicketService
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<TicketDto>> GetMineAsync(CancellationToken cancellationToken) =>
-        await _tickets.GetMineAsync(_currentUser.UserId, cancellationToken);
+    public async Task<IReadOnlyList<TicketDto>> GetMineAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<TicketDto> tickets = await _tickets.GetMineAsync(_currentUser.UserId, cancellationToken);
+        return await EnrichWithSlaDataAsync(tickets, cancellationToken);
+    }
 
-    public async Task<IReadOnlyList<TicketDto>> GetAssignedToMeAsync(CancellationToken cancellationToken) =>
-        await _tickets.GetAssignedToAsync(_currentUser.UserId, cancellationToken);
+    public async Task<IReadOnlyList<TicketDto>> GetAssignedToMeAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<TicketDto> tickets = await _tickets.GetAssignedToAsync(_currentUser.UserId, cancellationToken);
+        return await EnrichWithSlaDataAsync(tickets, cancellationToken);
+    }
 
-    public async Task<IReadOnlyList<TicketDto>> GetAllAsync(CancellationToken cancellationToken) =>
-        await _tickets.GetAllAsync(_currentUser.CompanyId, cancellationToken);
+    public async Task<IReadOnlyList<TicketDto>> GetAllAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<TicketDto> tickets = await _tickets.GetAllAsync(_currentUser.CompanyId, cancellationToken);
+        return await EnrichWithSlaDataAsync(tickets, cancellationToken);
+    }
 
     public async Task<IReadOnlyList<TechnicianDto>> GetTechniciansAsync(CancellationToken cancellationToken) =>
         await _users.GetTechniciansAsync(_currentUser.CompanyId, cancellationToken);
@@ -156,7 +165,12 @@ public sealed class TicketService : ITicketService
     {
         TicketDto? ticket = await _tickets.GetDtoByIdAsync(id, _currentUser.CompanyId, cancellationToken);
 
-        return ticket ?? throw new NotFoundException($"El ticket con id {id} no existe.");
+        if (ticket is null)
+        {
+            throw new NotFoundException($"El ticket con id {id} no existe.");
+        }
+
+        return await EnrichSingleSlaAsync(ticket, cancellationToken);
     }
 
     public async Task<TicketDto> StartWorkAsync(Guid id, CancellationToken cancellationToken)
@@ -493,4 +507,106 @@ public sealed class TicketService : ITicketService
 
     private static string BuildBlobName(Guid companyId, Guid ticketId, Guid attachmentId) =>
         $"{companyId:N}/{ticketId:N}/{attachmentId:N}";
+
+    private async Task<IReadOnlyList<TicketDto>> EnrichWithSlaDataAsync(
+        IReadOnlyList<TicketDto> tickets,
+        CancellationToken cancellationToken)
+    {
+        if (tickets.Count == 0)
+        {
+            return tickets;
+        }
+
+        Guid companyId = _currentUser.CompanyId;
+
+        IReadOnlyList<SlaConfiguration> slaConfigs = await _slaRepository.GetByCompanyAsync(
+            companyId,
+            cancellationToken);
+
+        Dictionary<TicketPriority, int> slaLimits = slaConfigs.ToDictionary(
+            c => c.Priority,
+            c => c.ResponseTimeHours);
+
+        CompanyBusinessHours? businessHours = await _slaRepository.GetBusinessHoursAsync(
+            companyId,
+            cancellationToken);
+
+        bool useBusinessHours = businessHours is not null && businessHours.UseBusinessHours;
+
+        List<TicketDto> enriched = new(tickets.Count);
+
+        foreach (TicketDto ticket in tickets)
+        {
+            enriched.Add(ComputeSlaFields(ticket, slaLimits, businessHours, useBusinessHours));
+        }
+
+        return enriched;
+    }
+
+    private async Task<TicketDto> EnrichSingleSlaAsync(
+        TicketDto ticket,
+        CancellationToken cancellationToken)
+    {
+        Guid companyId = _currentUser.CompanyId;
+
+        IReadOnlyList<SlaConfiguration> slaConfigs = await _slaRepository.GetByCompanyAsync(
+            companyId,
+            cancellationToken);
+
+        Dictionary<TicketPriority, int> slaLimits = slaConfigs.ToDictionary(
+            c => c.Priority,
+            c => c.ResponseTimeHours);
+
+        CompanyBusinessHours? businessHours = await _slaRepository.GetBusinessHoursAsync(
+            companyId,
+            cancellationToken);
+
+        bool useBusinessHours = businessHours is not null && businessHours.UseBusinessHours;
+
+        return ComputeSlaFields(ticket, slaLimits, businessHours, useBusinessHours);
+    }
+
+    private static TicketDto ComputeSlaFields(
+        TicketDto ticket,
+        Dictionary<TicketPriority, int> slaLimits,
+        CompanyBusinessHours? businessHours,
+        bool useBusinessHours)
+    {
+        int slaLimit = slaLimits.GetValueOrDefault(ticket.Priority, 4);
+
+        decimal percentageElapsed = 0;
+        bool isOverdue = false;
+
+        if (ticket.StartedWorkAtUtc is not null)
+        {
+            DateTime now = DateTime.UtcNow;
+
+            if (useBusinessHours && businessHours is not null)
+            {
+                percentageElapsed = BusinessHoursCalculator.CalculatePercentageElapsed(
+                    ticket.StartedWorkAtUtc.Value,
+                    now,
+                    businessHours,
+                    slaLimit);
+            }
+            else
+            {
+                TimeSpan elapsed = now - ticket.StartedWorkAtUtc.Value;
+                percentageElapsed = slaLimit > 0
+                    ? (decimal)(elapsed.TotalHours / slaLimit * 100)
+                    : 0;
+            }
+
+            isOverdue = ticket.ResolvedAtUtc is not null
+                ? ticket.ResolvedAtUtc.Value > ticket.ResponseDeadlineAtUtc
+                : percentageElapsed >= 100;
+        }
+
+        return ticket with
+        {
+            SlaLimitHours = slaLimit,
+            SlaPercentageElapsed = Math.Round(percentageElapsed, 1),
+            IsOverdue = isOverdue
+        };
+    }
 }

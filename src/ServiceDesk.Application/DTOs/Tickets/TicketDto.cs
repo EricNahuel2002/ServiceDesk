@@ -40,6 +40,8 @@ public sealed record TicketDto
 
     public DateTime? StartedWorkAtUtc { get; init; }
 
+    public DateTime? ResolvedAtUtc { get; init; }
+
     public int SlaLimitHours { get; init; }
 
     public decimal SlaPercentageElapsed { get; init; }

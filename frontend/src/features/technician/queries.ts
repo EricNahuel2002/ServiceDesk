@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useStatuses } from '../catalog/queries'
-import { getAssignedTickets, resolveTicket } from './api'
+import { getAssignedTickets, startWork, resolveTicket } from './api'
 import type { TicketDto } from '../tickets/types'
 
 export function useTechnicianTickets() {
@@ -16,6 +16,18 @@ export function useTechnicianTicket(id: string) {
       return tickets.find((t) => t.id === id) ?? null
     },
     enabled: Boolean(id),
+  })
+}
+
+export function useStartWork() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => startWork(id),
+    onSuccess: (_result, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['technician', 'tickets'] })
+      void queryClient.invalidateQueries({ queryKey: ['technician', 'tickets', variables] })
+    },
   })
 }
 

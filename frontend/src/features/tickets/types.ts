@@ -13,8 +13,7 @@ export interface TicketDto {
   companyId: string
   categoryId: string
   categoryName: string
-  priorityId: string
-  priorityName: string
+  priority: number
   statusId: string
   statusName: string
   createdById: string
@@ -24,6 +23,11 @@ export interface TicketDto {
   assignedToEmail: string | null
   createdAtUtc: string
   updatedAtUtc: string | null
+  responseDeadlineAtUtc: string
+  startedWorkAtUtc: string | null
+  slaLimitHours: number
+  slaPercentageElapsed: number
+  isOverdue: boolean
   attachments: TicketAttachmentDto[]
 }
 
@@ -35,7 +39,7 @@ export interface CreateTicketRequest {
 
 export interface UpdateTicketRequest {
   assignedToId: string
-  priorityId: string
+  priority: number
   statusId: string
 }
 

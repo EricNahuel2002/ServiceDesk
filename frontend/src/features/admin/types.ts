@@ -7,17 +7,6 @@ export interface UpdateCategoryRequest {
   isActive: boolean
 }
 
-export interface CreatePriorityRequest {
-  name: string
-  sortOrder: number
-}
-
-export interface UpdatePriorityRequest {
-  name: string
-  sortOrder: number
-  isActive: boolean
-}
-
 export interface CreateStatusRequest {
   name: string
   sortOrder: number
@@ -48,4 +37,38 @@ export interface UserListItemDto {
   role: string
   isActive: boolean
   createdAtUtc: string
+}
+
+export interface AdminMetricsDto {
+  totalTickets: number
+  openTickets: number
+  inProgressTickets: number
+  resolvedTickets: number
+  overdueTickets: number
+  averageResolutionHours: number
+  slaCompliancePercentage: number
+  byPriority: PriorityMetricDto[]
+  dailyTrend: DailyMetricDto[]
+  byTechnician: TechnicianMetricDto[]
+}
+
+export interface PriorityMetricDto {
+  priority: number
+  count: number
+  overdueCount: number
+}
+
+export interface DailyMetricDto {
+  date: string
+  created: number
+  resolved: number
+}
+
+export interface TechnicianMetricDto {
+  userId: string
+  firstName: string
+  lastName: string
+  assignedCount: number
+  resolvedCount: number
+  averageResolutionHours: number
 }

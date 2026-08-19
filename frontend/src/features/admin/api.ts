@@ -3,14 +3,13 @@ import type { TicketDto, TechnicianDto, UpdateTicketRequest } from '../tickets/t
 import type {
   CreateCategoryRequest,
   UpdateCategoryRequest,
-  CreatePriorityRequest,
-  UpdatePriorityRequest,
   CreateStatusRequest,
   UpdateStatusRequest,
   CreateUserRequest,
 } from './types'
-import type { CategoryDto, PriorityDto, StatusDto } from '../catalog/types'
+import type { CategoryDto, StatusDto } from '../catalog/types'
 import type { UserListItemDto } from './types'
+import type { AdminMetricsDto } from './types'
 
 export function getAllTickets(): Promise<TicketDto[]> {
   return apiClient.get<TicketDto[]>('/admin/tickets')
@@ -40,18 +39,6 @@ export function updateCategory(id: string, data: UpdateCategoryRequest): Promise
   return apiClient.put<CategoryDto>(`/admin/catalog/categories/${id}`, data)
 }
 
-export function getAllPriorities(): Promise<PriorityDto[]> {
-  return apiClient.get<PriorityDto[]>('/admin/catalog/priorities')
-}
-
-export function createPriority(data: CreatePriorityRequest): Promise<PriorityDto> {
-  return apiClient.post<PriorityDto>('/admin/catalog/priorities', data)
-}
-
-export function updatePriority(id: string, data: UpdatePriorityRequest): Promise<PriorityDto> {
-  return apiClient.put<PriorityDto>(`/admin/catalog/priorities/${id}`, data)
-}
-
 export function getAllStatuses(): Promise<StatusDto[]> {
   return apiClient.get<StatusDto[]>('/admin/catalog/statuses')
 }
@@ -70,4 +57,17 @@ export function getAllUsers(): Promise<UserListItemDto[]> {
 
 export function createUser(data: CreateUserRequest): Promise<unknown> {
   return apiClient.post('/users', data)
+}
+
+export function getMetrics(params: {
+  from?: string
+  to?: string
+  technicianId?: string
+}): Promise<AdminMetricsDto> {
+  const searchParams = new URLSearchParams()
+  if (params.from) searchParams.set('from', params.from)
+  if (params.to) searchParams.set('to', params.to)
+  if (params.technicianId) searchParams.set('technicianId', params.technicianId)
+  const query = searchParams.toString()
+  return apiClient.get<AdminMetricsDto>(`/admin/metrics${query ? `?${query}` : ''}`)
 }

@@ -2,10 +2,13 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Card } from '../../components/common/Card'
 import { Badge } from '../../components/common/Badge'
+import { SlaTicketBadge } from '../../components/common/SlaTicketBadge'
 import { AdminAppShell } from '../../components/layout/AdminAppShell'
 import { useAdminTickets, useIsTicketClosed } from '../../features/admin/queries'
 import { requireAdmin } from '../../features/admin/auth'
 import { formatDate } from '../../utils/format'
+import { getPriorityLabel, getPriorityBadgeColor } from '../../utils/priority'
+import { getStatusBadgeColor } from '../../utils/status'
 
 export const Route = createFileRoute('/admin/')({
   beforeLoad: () => requireAdmin(),
@@ -21,30 +24,6 @@ const tabs: { id: Tab; label: string }[] = [
   { id: 'finalizados', label: 'Finalizados' },
   { id: 'cancelados', label: 'Cancelados' },
 ]
-
-function getStatusBadgeColor(statusName: string): 'blue' | 'amber' | 'green' | 'red' | 'gray' {
-  const lower = statusName.toLowerCase()
-  if (lower.includes('nuevo') || lower.includes('abierto') || lower.includes('new') || lower.includes('open'))
-    return 'blue'
-  if (lower.includes('progreso') || lower.includes('asignad') || lower.includes('progress') || lower.includes('assigned'))
-    return 'amber'
-  if (lower.includes('resuelto') || lower.includes('finalizado') || lower.includes('closed') || lower.includes('resolved'))
-    return 'green'
-  if (lower.includes('cancelado') || lower.includes('cerrado') || lower.includes('cancelled') || lower.includes('canceled'))
-    return 'red'
-  return 'gray'
-}
-
-function getPriorityBadgeColor(priorityName: string): 'red' | 'amber' | 'green' | 'gray' {
-  const lower = priorityName.toLowerCase()
-  if (lower.includes('alta') || lower.includes('high') || lower.includes('urgente'))
-    return 'red'
-  if (lower.includes('media') || lower.includes('medium') || lower.includes('normal'))
-    return 'amber'
-  if (lower.includes('baja') || lower.includes('low'))
-    return 'green'
-  return 'gray'
-}
 
 function AdminDashboardPage() {
   const tickets = useAdminTickets()
@@ -175,13 +154,22 @@ function AdminDashboardPage() {
               <Card className="flex flex-col gap-3">
                 <div className="flex items-start justify-between">
                   <p className="font-semibold text-gray-900">{ticket.title}</p>
-                  <Link
-                    to="/admin/tickets/$ticketId"
-                    params={{ ticketId: ticket.id }}
-                    className="shrink-0 rounded-md bg-[#0F52BA] px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800"
-                  >
-                    Ver detalle
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    {!isClosed(ticket) && ticket.startedWorkAtUtc && (
+                      <SlaTicketBadge
+                        responseDeadlineAtUtc={ticket.responseDeadlineAtUtc}
+                        startedWorkAtUtc={ticket.startedWorkAtUtc}
+                        slaPercentageElapsed={ticket.slaPercentageElapsed}
+                      />
+                    )}
+                    <Link
+                      to="/admin/tickets/$ticketId"
+                      params={{ ticketId: ticket.id }}
+                      className="shrink-0 rounded-md bg-[#0F52BA] px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800"
+                    >
+                      Ver detalle
+                    </Link>
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-1.5">
@@ -192,8 +180,8 @@ function AdminDashboardPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-gray-500">Prioridad:</span>
-                    <Badge color={getPriorityBadgeColor(ticket.priorityName)}>
-                      {ticket.priorityName}
+                    <Badge color={getPriorityBadgeColor(ticket.priority)}>
+                      {getPriorityLabel(ticket.priority)}
                     </Badge>
                   </div>
                 </div>

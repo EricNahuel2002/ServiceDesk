@@ -29,6 +29,7 @@ public sealed class TicketRepository : ITicketRepository
         UpdatedAtUtc = ticket.UpdatedAtUtc,
         ResponseDeadlineAtUtc = ticket.ResponseDeadlineAtUtc,
         StartedWorkAtUtc = ticket.StartedWorkAtUtc,
+        ResolvedAtUtc = ticket.ResolvedAtUtc,
         Attachments = ticket.Attachments
             .Select(attachment => new TicketAttachmentDto
             {

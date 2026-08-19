@@ -7,35 +7,13 @@ import { useOpenChat } from '../../features/chat/ChatWidgetContext'
 import { useTickets, useIsTicketClosed } from '../../features/tickets/queries'
 import { requireCliente } from '../../features/tickets/auth'
 import { formatDate } from '../../utils/format'
+import { getPriorityLabel, getPriorityBadgeColor } from '../../utils/priority'
+import { getStatusBadgeColor } from '../../utils/status'
 
 export const Route = createFileRoute('/tickets/$ticketId')({
   beforeLoad: () => requireCliente(),
   component: ClientTicketDetailPage,
 })
-
-function getStatusBadgeColor(statusName: string): 'blue' | 'amber' | 'green' | 'red' | 'gray' {
-  const lower = statusName.toLowerCase()
-  if (lower.includes('nuevo') || lower.includes('abierto') || lower.includes('new') || lower.includes('open'))
-    return 'blue'
-  if (lower.includes('progreso') || lower.includes('asignad') || lower.includes('progress') || lower.includes('assigned'))
-    return 'amber'
-  if (lower.includes('resuelto') || lower.includes('finalizado') || lower.includes('closed') || lower.includes('resolved'))
-    return 'green'
-  if (lower.includes('cancelado') || lower.includes('cerrado') || lower.includes('cancelled') || lower.includes('canceled'))
-    return 'red'
-  return 'gray'
-}
-
-function getPriorityBadgeColor(priorityName: string): 'red' | 'amber' | 'green' | 'gray' {
-  const lower = priorityName.toLowerCase()
-  if (lower.includes('alta') || lower.includes('high') || lower.includes('urgente'))
-    return 'red'
-  if (lower.includes('media') || lower.includes('medium') || lower.includes('normal'))
-    return 'amber'
-  if (lower.includes('baja') || lower.includes('low'))
-    return 'green'
-  return 'gray'
-}
 
 function ClientTicketDetailPage() {
   const { ticketId } = Route.useParams()
@@ -100,7 +78,7 @@ function ClientTicketDetailPage() {
                       Prioridad
                     </span>
                     <div>
-                      <Badge color={getPriorityBadgeColor(ticket.priorityName)}>{ticket.priorityName}</Badge>
+                      <Badge color={getPriorityBadgeColor(ticket.priority)}>{getPriorityLabel(ticket.priority)}</Badge>
                     </div>
                   </div>
                   <div className="flex flex-col gap-1">

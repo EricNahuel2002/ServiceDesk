@@ -9,21 +9,17 @@ import {
   getAllCategories,
   createCategory,
   updateCategory,
-  getAllPriorities,
-  createPriority,
-  updatePriority,
   getAllStatuses,
   createStatus,
   updateStatus,
   getAllUsers,
   createUser,
+  getMetrics,
 } from './api'
 import type { TicketDto, UpdateTicketRequest } from '../tickets/types'
 import type {
   CreateCategoryRequest,
   UpdateCategoryRequest,
-  CreatePriorityRequest,
-  UpdatePriorityRequest,
   CreateStatusRequest,
   UpdateStatusRequest,
   CreateUserRequest,
@@ -83,10 +79,6 @@ export function useAdminCategories() {
   return useQuery({ queryKey: ['admin', 'categories'], queryFn: getAllCategories })
 }
 
-export function useAdminPriorities() {
-  return useQuery({ queryKey: ['admin', 'priorities'], queryFn: getAllPriorities })
-}
-
 export function useAdminStatuses() {
   return useQuery({ queryKey: ['admin', 'statuses'], queryFn: getAllStatuses })
 }
@@ -108,27 +100,6 @@ export function useUpdateCategory() {
       updateCategory(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'categories'] })
-    },
-  })
-}
-
-export function useCreatePriority() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (data: CreatePriorityRequest) => createPriority(data),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'priorities'] })
-    },
-  })
-}
-
-export function useUpdatePriority() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdatePriorityRequest }) =>
-      updatePriority(id, data),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'priorities'] })
     },
   })
 }
@@ -165,5 +136,12 @@ export function useCreateUser() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
     },
+  })
+}
+
+export function useMetrics(params: { from?: string; to?: string; technicianId?: string }) {
+  return useQuery({
+    queryKey: ['admin', 'metrics', params.from, params.to, params.technicianId],
+    queryFn: () => getMetrics(params),
   })
 }

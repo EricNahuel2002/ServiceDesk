@@ -8,12 +8,9 @@ import { AdminAppShell } from '../../../components/layout/AdminAppShell'
 import { requireAdmin } from '../../../features/admin/auth'
 import {
   useAdminCategories,
-  useAdminPriorities,
   useAdminStatuses,
   useCreateCategory,
   useUpdateCategory,
-  useCreatePriority,
-  useUpdatePriority,
   useCreateStatus,
   useUpdateStatus,
 } from '../../../features/admin/queries'
@@ -23,11 +20,10 @@ export const Route = createFileRoute('/admin/catalogs/')({
   component: AdminCatalogsPage,
 })
 
-type Tab = 'categories' | 'priorities' | 'statuses'
+type Tab = 'categories' | 'statuses'
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'categories', label: 'Categorías' },
-  { id: 'priorities', label: 'Prioridades' },
   { id: 'statuses', label: 'Estados' },
 ]
 
@@ -58,7 +54,6 @@ function AdminCatalogsPage() {
       </div>
 
       {tab === 'categories' && <CategoriesTab />}
-      {tab === 'priorities' && <PrioritiesTab />}
       {tab === 'statuses' && <StatusesTab />}
     </AdminAppShell>
   )
@@ -194,160 +189,6 @@ function CategoriesTab() {
                   <Button
                     variant="secondary"
                     onClick={() => handleEdit(cat)}
-                    className="text-xs"
-                  >
-                    Editar
-                  </Button>
-                </div>
-              </Card>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-function PrioritiesTab() {
-  const priorities = useAdminPriorities()
-  const createPriority = useCreatePriority()
-  const updatePriority = useUpdatePriority()
-
-  const [showForm, setShowForm] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [sortOrder, setSortOrder] = useState(0)
-  const [isActive, setIsActive] = useState(true)
-  const [error, setError] = useState('')
-
-  function resetForm() {
-    setShowForm(false)
-    setEditingId(null)
-    setName('')
-    setSortOrder(0)
-    setIsActive(true)
-    setError('')
-  }
-
-  function handleEdit(item: { id: string; name: string; sortOrder: number; isActive: boolean }) {
-    setEditingId(item.id)
-    setName(item.name)
-    setSortOrder(item.sortOrder)
-    setIsActive(item.isActive)
-    setShowForm(true)
-    setError('')
-  }
-
-  function handleSubmit() {
-    if (!name.trim()) {
-      setError('El nombre es obligatorio.')
-      return
-    }
-
-    if (editingId) {
-      updatePriority.mutate(
-        { id: editingId, data: { name: name.trim(), sortOrder, isActive } },
-        {
-          onSuccess: () => resetForm(),
-          onError: (err) => {
-            setError(err instanceof Error ? err.message : 'Error al guardar.')
-          },
-        },
-      )
-    } else {
-      createPriority.mutate(
-        { name: name.trim(), sortOrder },
-        {
-          onSuccess: () => resetForm(),
-          onError: (err) => {
-            setError(err instanceof Error ? err.message : 'Error al crear.')
-          },
-        },
-      )
-    }
-  }
-
-  if (priorities.isPending) return <p className="text-gray-500">Cargando...</p>
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {priorities.data?.length ?? 0} prioridades
-        </p>
-        {!showForm && (
-          <Button onClick={() => { setShowForm(true); setEditingId(null); setError('') }}>
-            + Nuevo
-          </Button>
-        )}
-      </div>
-
-      {showForm && (
-        <Card>
-          <h3 className="mb-3 text-sm font-semibold text-gray-900">
-            {editingId ? 'Editar prioridad' : 'Nueva prioridad'}
-          </h3>
-          <div className="flex flex-col gap-3">
-            <Input
-              label="Nombre"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nombre de la prioridad"
-            />
-            <Input
-              label="Orden"
-              type="number"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(Number(e.target.value))}
-              min={0}
-            />
-            {editingId && (
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                Activo
-              </label>
-            )}
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <div className="flex gap-2">
-              <Button
-                onClick={handleSubmit}
-                disabled={createPriority.isPending || updatePriority.isPending}
-              >
-                {createPriority.isPending || updatePriority.isPending
-                  ? 'Guardando...'
-                  : 'Guardar'}
-              </Button>
-              <Button variant="secondary" onClick={resetForm}>
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {priorities.data?.length === 0 ? (
-        <p className="text-gray-500">No hay prioridades.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {priorities.data?.map((item) => (
-            <li key={item.id}>
-              <Card className="flex items-center justify-between">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-semibold text-gray-900">{item.name}</span>
-                  <span className="text-xs text-gray-500">Nivel de prioridad: {item.sortOrder}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge color={item.isActive ? 'green' : 'gray'}>
-                    {item.isActive ? 'Activo' : 'Inactivo'}
-                  </Badge>
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleEdit(item)}
                     className="text-xs"
                   >
                     Editar

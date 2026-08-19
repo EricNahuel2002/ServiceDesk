@@ -4,13 +4,6 @@ export interface CategoryDto {
   isActive: boolean
 }
 
-export interface PriorityDto {
-  id: string
-  name: string
-  sortOrder: number
-  isActive: boolean
-}
-
 export interface StatusDto {
   id: string
   name: string
