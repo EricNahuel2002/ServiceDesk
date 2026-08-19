@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Domain.Audit;
@@ -15,6 +16,8 @@ namespace ServiceDesk.Infrastructure.Persistence;
 
 public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>, IUnitOfWork
 {
+    private static readonly DateTimeUtcInterceptor _dateTimeUtcInterceptor = new();
+
     public ServiceDeskDbContext(DbContextOptions<ServiceDeskDbContext> options)
         : base(options)
     {
@@ -41,6 +44,12 @@ public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<SlaConfiguration> SlaConfigurations => Set<SlaConfiguration>();
 
     public DbSet<CompanyBusinessHours> CompanyBusinessHours => Set<CompanyBusinessHours>();
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+        optionsBuilder.AddInterceptors(_dateTimeUtcInterceptor);
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -88,5 +97,47 @@ public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, Applicati
                 entry.Property(nameof(BaseEntity.UpdatedAtUtc)).CurrentValue = now;
                 break;
         }
+    }
+}
+
+internal sealed class DateTimeUtcInterceptor : IMaterializationInterceptor
+{
+    public object InitializedInstance(MaterializationInterceptionData materializationData, object entity)
+    {
+        if (entity is BaseEntity baseEntity)
+        {
+            baseEntity.CreatedAtUtc = EnsureUtc(baseEntity.CreatedAtUtc);
+            if (baseEntity.UpdatedAtUtc.HasValue)
+                baseEntity.UpdatedAtUtc = EnsureUtc(baseEntity.UpdatedAtUtc.Value);
+        }
+
+        if (entity is Ticket ticket)
+        {
+            ticket.ResponseDeadlineAtUtc = EnsureUtc(ticket.ResponseDeadlineAtUtc);
+            if (ticket.StartedWorkAtUtc.HasValue)
+                ticket.StartedWorkAtUtc = EnsureUtc(ticket.StartedWorkAtUtc.Value);
+            if (ticket.ResolvedAtUtc.HasValue)
+                ticket.ResolvedAtUtc = EnsureUtc(ticket.ResolvedAtUtc.Value);
+        }
+
+        if (entity is RefreshToken refreshToken)
+        {
+            refreshToken.CreatedAtUtc = EnsureUtc(refreshToken.CreatedAtUtc);
+            refreshToken.ExpiresAtUtc = EnsureUtc(refreshToken.ExpiresAtUtc);
+            if (refreshToken.RevokedAtUtc.HasValue)
+                refreshToken.RevokedAtUtc = EnsureUtc(refreshToken.RevokedAtUtc.Value);
+        }
+
+        if (entity is ChatMessage chatMessage)
+        {
+            chatMessage.SentAtUtc = EnsureUtc(chatMessage.SentAtUtc);
+        }
+
+        return entity;
+    }
+
+    private static DateTime EnsureUtc(DateTime value)
+    {
+        return value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
     }
 }

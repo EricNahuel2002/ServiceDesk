@@ -25,11 +25,17 @@ public sealed class TicketRepository : ITicketRepository
         AssignedToFirstName = ticket.AssignedTo!.FirstName,
         AssignedToLastName = ticket.AssignedTo!.LastName,
         AssignedToEmail = ticket.AssignedTo!.Email,
-        CreatedAtUtc = ticket.CreatedAtUtc,
-        UpdatedAtUtc = ticket.UpdatedAtUtc,
-        ResponseDeadlineAtUtc = ticket.ResponseDeadlineAtUtc,
-        StartedWorkAtUtc = ticket.StartedWorkAtUtc,
-        ResolvedAtUtc = ticket.ResolvedAtUtc,
+        CreatedAtUtc = DateTime.SpecifyKind(ticket.CreatedAtUtc, DateTimeKind.Utc),
+        UpdatedAtUtc = ticket.UpdatedAtUtc.HasValue
+            ? DateTime.SpecifyKind(ticket.UpdatedAtUtc.Value, DateTimeKind.Utc)
+            : null,
+        ResponseDeadlineAtUtc = DateTime.SpecifyKind(ticket.ResponseDeadlineAtUtc, DateTimeKind.Utc),
+        StartedWorkAtUtc = ticket.StartedWorkAtUtc.HasValue
+            ? DateTime.SpecifyKind(ticket.StartedWorkAtUtc.Value, DateTimeKind.Utc)
+            : null,
+        ResolvedAtUtc = ticket.ResolvedAtUtc.HasValue
+            ? DateTime.SpecifyKind(ticket.ResolvedAtUtc.Value, DateTimeKind.Utc)
+            : null,
         Attachments = ticket.Attachments
             .Select(attachment => new TicketAttachmentDto
             {
