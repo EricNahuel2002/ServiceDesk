@@ -8,6 +8,7 @@ import { ChatWidgetContextProvider } from '../features/chat/ChatWidgetContext'
 import { useAuth } from '../hooks/useAuth'
 import { getMyTickets } from '../features/tickets/api'
 import { getAssignedTickets } from '../features/technician/api'
+import type { TicketDto } from '../features/tickets/types'
 
 interface RouterContext {
   queryClient: QueryClient
@@ -32,10 +33,13 @@ function RootComponent() {
 function ChatWidgetWrapper() {
   const { user, isAuthenticated } = useAuth()
 
-  const isChatEnabled =
-    isAuthenticated && user && (user.role === 'Tecnico' || user.role === 'Cliente')
+  const isChatEnabled = Boolean(
+    isAuthenticated &&
+      user &&
+      (user.role === 'Tecnico' || user.role === 'Cliente'),
+  )
 
-  const ticketsQuery = useQuery({
+  const ticketsQuery = useQuery<TicketDto[]>({
     queryKey: ['chat-widget-tickets'],
     queryFn: user?.role === 'Tecnico' ? getAssignedTickets : getMyTickets,
     enabled: isChatEnabled,

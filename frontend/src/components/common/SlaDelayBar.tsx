@@ -18,24 +18,29 @@ export function SlaDelayBar({
   startedWorkAtUtc,
   delayMinutes,
 }: SlaDelayBarProps) {
-  const [liveDelay, setLiveDelay] = useState(0)
+  const computeInitialLiveDelay = () => {
+    if (!assignedAtUtc || startedWorkAtUtc) return 0
+    if (delayMinutes <= 0) return 0
+
+    const minutesElapsed = Math.floor((Date.now() - new Date(assignedAtUtc).getTime()) / 60000)
+    return Math.max(0, minutesElapsed - delayMinutes)
+  }
+
+  const [liveDelay, setLiveDelay] = useState(() => computeInitialLiveDelay())
 
   useEffect(() => {
     if (!assignedAtUtc || startedWorkAtUtc) return
 
-    const graceMinutes = delayMinutes > 0
-      ? Math.floor((Date.now() - new Date(assignedAtUtc).getTime()) / 60000) - delayMinutes
-      : null
+    const tick = () => {
+      if (delayMinutes <= 0) {
+        setLiveDelay(0)
+        return
+      }
 
-    if (graceMinutes === null) {
-      setLiveDelay(0)
-      return
+      const minutesElapsed = Math.floor((Date.now() - new Date(assignedAtUtc).getTime()) / 60000)
+      setLiveDelay(Math.max(0, minutesElapsed - delayMinutes))
     }
 
-    const tick = () =>
-      setLiveDelay(Math.max(0, Math.floor((Date.now() - new Date(assignedAtUtc).getTime()) / 60000) - graceMinutes))
-
-    tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [assignedAtUtc, startedWorkAtUtc, delayMinutes])
