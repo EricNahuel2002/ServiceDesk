@@ -1,0 +1,220 @@
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useState } from 'react'
+import { Card } from '../../components/common/Card'
+import { Badge } from '../../components/common/Badge'
+import { SlaTicketBadge } from '../../components/common/SlaTicketBadge'
+import { AdminAppShell } from '../../components/layout/AdminAppShell'
+import { useAdminTickets, useIsTicketClosed } from '../../features/admin/queries'
+import { requireAdmin } from '../../features/admin/auth'
+import { formatDate } from '../../utils/format'
+import { getPriorityLabel, getPriorityBadgeColor } from '../../utils/priority'
+import { getStatusBadgeColor } from '../../utils/status'
+
+export const Route = createFileRoute('/admin/')({
+  beforeLoad: () => requireAdmin(),
+  component: AdminDashboardPage,
+})
+
+type Tab = 'todos' | 'sinAsignar' | 'progreso' | 'finalizados' | 'cancelados'
+
+const tabs: { id: Tab; label: string }[] = [
+  { id: 'todos', label: 'Todos' },
+  { id: 'sinAsignar', label: 'Sin asignar' },
+  { id: 'progreso', label: 'En progreso' },
+  { id: 'finalizados', label: 'Finalizados' },
+  { id: 'cancelados', label: 'Cancelados' },
+]
+
+function AdminDashboardPage() {
+  const tickets = useAdminTickets()
+  const { isClosed } = useIsTicketClosed()
+  const [tab, setTab] = useState<Tab>('todos')
+
+  const allTickets = tickets.data ?? []
+
+  const unassignedCount = allTickets.filter((t) => !t.assignedToId).length
+
+  const inProgressCount = allTickets.filter((t) => {
+    const lower = t.statusName.toLowerCase()
+    return (
+      !isClosed(t) &&
+      (lower.includes('progreso') ||
+        lower.includes('asignad') ||
+        lower.includes('progress') ||
+        lower.includes('assigned'))
+    )
+  }).length
+
+  const closedCount = allTickets.filter((t) => isClosed(t)).length
+
+  const cancelledCount = allTickets.filter((t) => {
+    const lower = t.statusName.toLowerCase()
+    return (
+      isClosed(t) &&
+      (lower.includes('cancelado') || lower.includes('cancelled') || lower.includes('canceled'))
+    )
+  }).length
+
+  const filteredTickets = allTickets.filter((ticket) => {
+    if (tab === 'todos') return true
+    if (tab === 'finalizados') return isClosed(ticket)
+    if (tab === 'cancelados') {
+      const lower = ticket.statusName.toLowerCase()
+      return (
+        isClosed(ticket) &&
+        (lower.includes('cancelado') || lower.includes('cancelled') || lower.includes('canceled'))
+      )
+    }
+    if (tab === 'sinAsignar') return !ticket.assignedToId
+    if (tab === 'progreso') {
+      const lower = ticket.statusName.toLowerCase()
+      return (
+        !isClosed(ticket) &&
+        (lower.includes('progreso') ||
+          lower.includes('asignad') ||
+          lower.includes('progress') ||
+          lower.includes('assigned'))
+      )
+    }
+    return true
+  })
+
+  return (
+    <AdminAppShell>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Panel de Administración</h1>
+      </div>
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <p className="text-sm text-gray-500">Total</p>
+          <p className="mt-1 text-2xl font-semibold text-gray-900">{allTickets.length}</p>
+        </Card>
+        <Card>
+          <p className="text-sm text-gray-500">Sin asignar</p>
+          <p className="mt-1 text-2xl font-semibold text-[#0F52BA]">{unassignedCount}</p>
+        </Card>
+        <Card>
+          <p className="text-sm text-gray-500">En progreso</p>
+          <p className="mt-1 text-2xl font-semibold text-amber-600">{inProgressCount}</p>
+        </Card>
+        <Card>
+          <p className="text-sm text-gray-500">Finalizados</p>
+          <p className="mt-1 text-2xl font-semibold text-green-600">{closedCount}</p>
+        </Card>
+        <Card>
+          <p className="text-sm text-gray-500">Cancelados</p>
+          <p className="mt-1 text-2xl font-semibold text-red-600">{cancelledCount}</p>
+        </Card>
+      </div>
+
+      <div className="mb-4 flex gap-1 rounded-lg border border-gray-200 bg-gray-100 p-1">
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              tab === item.id
+                ? 'bg-[#0F52BA] text-white'
+                : 'text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {tickets.isPending ? (
+        <p className="text-gray-500">Cargando...</p>
+      ) : filteredTickets.length === 0 ? (
+        <p className="text-gray-500">No hay tickets en esta sección.</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {filteredTickets.map((ticket) => (
+            <li key={ticket.id}>
+              <Card className="flex flex-col gap-3">
+                <div className="flex items-start justify-between">
+                  <p className="font-semibold text-gray-900">{ticket.title}</p>
+                  <div className="flex items-center gap-2">
+                    {!isClosed(ticket) && ticket.startedWorkAtUtc && (
+                      <SlaTicketBadge
+                        responseDeadlineAtUtc={ticket.responseDeadlineAtUtc}
+                        startedWorkAtUtc={ticket.startedWorkAtUtc}
+                        slaPercentageElapsed={ticket.slaPercentageElapsed}
+                      />
+                    )}
+                    <Link
+                      to="/admin/tickets/$ticketId"
+                      params={{ ticketId: ticket.id }}
+                      className="shrink-0 rounded-md bg-[#0F52BA] px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800"
+                    >
+                      Ver detalle
+                    </Link>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-gray-500">Estado:</span>
+                    <Badge color={getStatusBadgeColor(ticket.statusName)}>
+                      {ticket.statusName}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-gray-500">Prioridad:</span>
+                    <Badge color={getPriorityBadgeColor(ticket.priority)}>
+                      {getPriorityLabel(ticket.priority)}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Categoría
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {ticket.categoryName}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Técnico
+                    </span>
+                    {ticket.assignedToFirstName ? (
+                      <>
+                        <span className="text-sm font-medium text-gray-900">
+                          {ticket.assignedToFirstName} {ticket.assignedToLastName}
+                        </span>
+                        <span className="text-xs text-gray-500">{ticket.assignedToEmail}</span>
+                      </>
+                    ) : (
+                      <span className="text-sm text-gray-400">Sin asignar</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Creado
+                    </span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatDate(ticket.createdAtUtc)}
+                    </span>
+                  </div>
+                  {ticket.updatedAtUtc && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                        Actualizado
+                      </span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {formatDate(ticket.updatedAtUtc)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
+    </AdminAppShell>
+  )
+}

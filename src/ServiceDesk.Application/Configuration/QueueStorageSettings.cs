@@ -11,4 +11,6 @@ public sealed class QueueStorageSettings
     public string QueueName { get; set; } = NotificationQueues.TicketAssigned;
 
     public string ClientNotificationQueueName { get; set; } = NotificationQueues.TicketAssignedToClient;
+
+    public string ClientWorkNotificationQueueName { get; set; } = NotificationQueues.ClientWorkNotifications;
 }

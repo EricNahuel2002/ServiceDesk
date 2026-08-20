@@ -71,4 +71,21 @@ public sealed class AdminTicketsController : ControllerBase
 
         return Ok(ticket);
     }
+
+    [HttpPatch("{id:guid}/assign")]
+    [ProducesResponseType(typeof(TicketDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<TicketDto>> Assign(
+        Guid id,
+        AssignTicketRequest request,
+        CancellationToken cancellationToken)
+    {
+        TicketDto ticket = await _ticketService.AssignAsync(id, request, cancellationToken);
+
+        return Ok(ticket);
+    }
 }

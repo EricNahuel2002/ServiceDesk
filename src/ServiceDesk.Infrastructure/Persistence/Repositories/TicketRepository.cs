@@ -17,14 +17,28 @@ public sealed class TicketRepository : ITicketRepository
         CompanyId = ticket.CompanyId,
         CategoryId = ticket.CategoryId,
         CategoryName = ticket.Category!.Name,
-        PriorityId = ticket.PriorityId,
-        PriorityName = ticket.Priority!.Name,
+        Priority = ticket.Priority,
         StatusId = ticket.StatusId,
         StatusName = ticket.Status!.Name,
         CreatedById = ticket.CreatedById,
         AssignedToId = ticket.AssignedToId,
-        CreatedAtUtc = ticket.CreatedAtUtc,
-        UpdatedAtUtc = ticket.UpdatedAtUtc,
+        AssignedToFirstName = ticket.AssignedTo!.FirstName,
+        AssignedToLastName = ticket.AssignedTo!.LastName,
+        AssignedToEmail = ticket.AssignedTo!.Email,
+        CreatedAtUtc = DateTime.SpecifyKind(ticket.CreatedAtUtc, DateTimeKind.Utc),
+        UpdatedAtUtc = ticket.UpdatedAtUtc.HasValue
+            ? DateTime.SpecifyKind(ticket.UpdatedAtUtc.Value, DateTimeKind.Utc)
+            : null,
+        AssignedAtUtc = ticket.AssignedAtUtc.HasValue
+            ? DateTime.SpecifyKind(ticket.AssignedAtUtc.Value, DateTimeKind.Utc)
+            : null,
+        ResponseDeadlineAtUtc = DateTime.SpecifyKind(ticket.ResponseDeadlineAtUtc, DateTimeKind.Utc),
+        StartedWorkAtUtc = ticket.StartedWorkAtUtc.HasValue
+            ? DateTime.SpecifyKind(ticket.StartedWorkAtUtc.Value, DateTimeKind.Utc)
+            : null,
+        ResolvedAtUtc = ticket.ResolvedAtUtc.HasValue
+            ? DateTime.SpecifyKind(ticket.ResolvedAtUtc.Value, DateTimeKind.Utc)
+            : null,
         Attachments = ticket.Attachments
             .Select(attachment => new TicketAttachmentDto
             {
@@ -104,7 +118,7 @@ public sealed class TicketRepository : ITicketRepository
                 TicketId = ticket.Id,
                 Title = ticket.Title,
                 Description = ticket.Description,
-                PriorityName = ticket.Priority!.Name,
+                PriorityName = ticket.Priority != null ? ticket.Priority.ToString()! : "Sin asignar",
                 AssignedToFirstName = ticket.AssignedTo!.FirstName,
                 AssignedToLastName = ticket.AssignedTo!.LastName,
                 AssignedToEmail = ticket.AssignedTo!.Email ?? string.Empty,
@@ -125,7 +139,69 @@ public sealed class TicketRepository : ITicketRepository
                 && attachment.Ticket!.CompanyId == companyId)
             .SingleOrDefaultAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Ticket>> GetSlaTrackedTicketsAsync(CancellationToken cancellationToken = default) =>
+        await _context.Tickets
+            .Where(ticket => ticket.ResolvedAtUtc == null
+                && ticket.AssignedToId != null
+                && ticket.Priority != null
+                && ticket.SlaRecords.Any(record => record.IsCurrent && record.CanceledAtUtc == null))
+            .Include(ticket => ticket.SlaRecords)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Ticket>> GetAssignedUnstartedTicketsAsync(CancellationToken cancellationToken = default) =>
+        await _context.Tickets
+            .Where(ticket => ticket.ResolvedAtUtc == null
+                && ticket.AssignedToId != null
+                && ticket.AssignedAtUtc != null
+                && ticket.StartedWorkAtUtc == null
+                && ticket.Priority != null
+                && ticket.SlaRecords.Any(record => record.IsCurrent && record.CanceledAtUtc == null))
+            .Include(ticket => ticket.SlaRecords)
+            .ToListAsync(cancellationToken);
+
+    public async Task<TicketSlaRecord?> GetCurrentSlaRecordAsync(
+        Guid ticketId,
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketSlaRecords
+            .Where(record => record.TicketId == ticketId && record.IsCurrent && record.CanceledAtUtc == null)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsByTicketIdsAsync(
+        IReadOnlyCollection<Guid> ticketIds,
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketSlaRecords
+            .Where(record => ticketIds.Contains(record.TicketId))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsByIdsAsync(
+        IReadOnlyCollection<Guid> recordIds,
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketSlaRecords
+            .Where(record => recordIds.Contains(record.Id))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TicketSlaRecord>> GetCanceledSlaRecordsPendingNotificationAsync(
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketSlaRecords
+            .Where(record => record.CanceledAtUtc != null
+                && record.CanceledNotifiedAtUtc == null
+                && record.TechnicianId != null
+                && record.CanceledReason != SlaRecordCancelReason.AssignmentStartGraceExceeded)
+            .Include(record => record.Ticket)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsPendingAdminReassignmentNotificationAsync(
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketSlaRecords
+            .Where(record => record.CanceledAtUtc != null
+                && record.CanceledReason == SlaRecordCancelReason.AssignmentStartGraceExceeded
+                && record.AdminReassignmentNotifiedAtUtc == null)
+            .Include(record => record.Ticket)
+            .ToListAsync(cancellationToken);
+
     public void Add(Ticket ticket) => _context.Tickets.Add(ticket);
+
+    public void AddSlaRecord(TicketSlaRecord record) => _context.TicketSlaRecords.Add(record);
 
     public void AddComment(TicketComment comment) => _context.TicketComments.Add(comment);
 }

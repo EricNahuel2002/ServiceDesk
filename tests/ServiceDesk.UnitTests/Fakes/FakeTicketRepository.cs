@@ -9,10 +9,62 @@ internal sealed class FakeTicketRepository : ITicketRepository
 {
     public TicketNotificationInfo? NotificationInfo { get; set; }
 
+    public List<Ticket> SlaTickets { get; } = [];
+
+    public List<TicketSlaRecord> SlaRecords { get; } = [];
+
+    public List<TicketComment> Comments { get; } = [];
+
     public Task<TicketNotificationInfo?> GetTicketNotificationInfoAsync(
         Guid ticketId,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(NotificationInfo);
+
+    public Task<IReadOnlyList<Ticket>> GetSlaTrackedTicketsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Ticket>>(SlaTickets);
+
+    public Task<IReadOnlyList<Ticket>> GetAssignedUnstartedTicketsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Ticket>>(SlaTickets);
+
+    public Task<TicketSlaRecord?> GetCurrentSlaRecordAsync(
+        Guid ticketId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(SlaRecords.FirstOrDefault(record =>
+            record.TicketId == ticketId && record.IsCurrent && record.CanceledAtUtc == null));
+
+    public Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsByTicketIdsAsync(
+        IReadOnlyCollection<Guid> ticketIds,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<TicketSlaRecord>>(
+            SlaRecords.Where(record => ticketIds.Contains(record.TicketId)).ToList());
+
+    public Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsByIdsAsync(
+        IReadOnlyCollection<Guid> recordIds,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<TicketSlaRecord>>(
+            SlaRecords.Where(record => recordIds.Contains(record.Id)).ToList());
+
+    public Task<IReadOnlyList<TicketSlaRecord>> GetCanceledSlaRecordsPendingNotificationAsync(
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<TicketSlaRecord>>(SlaRecords
+            .Where(record => record.CanceledAtUtc != null
+                && record.CanceledNotifiedAtUtc == null
+                && record.TechnicianId != null)
+            .ToList());
+
+    public Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsPendingAdminReassignmentNotificationAsync(
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<TicketSlaRecord>>(SlaRecords
+            .Where(record => record.CanceledAtUtc != null
+                && record.CanceledReason == SlaRecordCancelReason.AssignmentStartGraceExceeded
+                && record.AdminReassignmentNotifiedAtUtc == null)
+            .ToList());
+
+    public void Add(Ticket ticket) => throw new NotSupportedException();
+
+    public void AddSlaRecord(TicketSlaRecord record) => SlaRecords.Add(record);
+
+    public void AddComment(TicketComment comment) => Comments.Add(comment);
 
     public Task<IReadOnlyList<TicketDto>> GetMineAsync(
         Guid createdById,
@@ -54,8 +106,4 @@ internal sealed class FakeTicketRepository : ITicketRepository
         Guid companyId,
         CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
-
-    public void Add(Ticket ticket) => throw new NotSupportedException();
-
-    public void AddComment(TicketComment comment) => throw new NotSupportedException();
 }

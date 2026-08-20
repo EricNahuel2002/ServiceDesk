@@ -67,94 +67,6 @@ public sealed class CatalogVerificationServiceTests
             () => service.EnsureCategoryBelongsToCompanyAsync(Guid.NewGuid()));
     }
 
-    [Fact]
-    public async Task EnsurePriorityBelongsToCompanyAsync_OwnActivePriority_DoesNotThrow()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Priority priority = CreatePriority(CompanyId, isActive: true);
-        context.Priorities.Add(priority);
-        await context.SaveChangesAsync();
-
-        ICatalogVerificationService service = CreateService(context);
-
-        await service.EnsurePriorityBelongsToCompanyAsync(priority.Id);
-    }
-
-    [Fact]
-    public async Task EnsurePriorityBelongsToCompanyAsync_PriorityOfAnotherCompany_Throws()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Priority priority = CreatePriority(Guid.NewGuid());
-        context.Priorities.Add(priority);
-        await context.SaveChangesAsync();
-
-        ICatalogVerificationService service = CreateService(context);
-
-        ValidationException exception = await Assert.ThrowsAsync<ValidationException>(
-            () => service.EnsurePriorityBelongsToCompanyAsync(priority.Id));
-
-        Assert.Contains("PriorityId", exception.Errors.Keys);
-    }
-
-    [Fact]
-    public async Task EnsurePriorityBelongsToCompanyAsync_InactivePriority_Throws()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Priority priority = CreatePriority(CompanyId, isActive: false);
-        context.Priorities.Add(priority);
-        await context.SaveChangesAsync();
-
-        ICatalogVerificationService service = CreateService(context);
-
-        await Assert.ThrowsAsync<ValidationException>(
-            () => service.EnsurePriorityBelongsToCompanyAsync(priority.Id));
-    }
-
-    [Fact]
-    public async Task EnsureStatusBelongsToCompanyAsync_OwnActiveStatus_ReturnsStatus()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Status status = CreateStatus(CompanyId, isActive: true);
-        context.Statuses.Add(status);
-        await context.SaveChangesAsync();
-
-        ICatalogVerificationService service = CreateService(context);
-
-        Status validated = await service.EnsureStatusBelongsToCompanyAsync(status.Id);
-
-        Assert.Equal(status.Id, validated.Id);
-    }
-
-    [Fact]
-    public async Task EnsureStatusBelongsToCompanyAsync_StatusOfAnotherCompany_Throws()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Status status = CreateStatus(Guid.NewGuid());
-        context.Statuses.Add(status);
-        await context.SaveChangesAsync();
-
-        ICatalogVerificationService service = CreateService(context);
-
-        ValidationException exception = await Assert.ThrowsAsync<ValidationException>(
-            () => service.EnsureStatusBelongsToCompanyAsync(status.Id));
-
-        Assert.Contains("StatusId", exception.Errors.Keys);
-    }
-
-    [Fact]
-    public async Task EnsureStatusBelongsToCompanyAsync_InactiveStatus_Throws()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Status status = CreateStatus(CompanyId, isActive: false);
-        context.Statuses.Add(status);
-        await context.SaveChangesAsync();
-
-        ICatalogVerificationService service = CreateService(context);
-
-        await Assert.ThrowsAsync<ValidationException>(
-            () => service.EnsureStatusBelongsToCompanyAsync(status.Id));
-    }
-
     private static ServiceDeskDbContext CreateContext()
     {
         DbContextOptions<ServiceDeskDbContext> options = new DbContextOptionsBuilder<ServiceDeskDbContext>()
@@ -169,18 +81,4 @@ public sealed class CatalogVerificationServiceTests
 
     private static Category CreateCategory(Guid companyId, bool isActive = true) =>
         new() { Id = Guid.NewGuid(), CompanyId = companyId, Name = "Hardware", IsActive = isActive };
-
-    private static Priority CreatePriority(Guid companyId, bool isActive = true) =>
-        new() { Id = Guid.NewGuid(), CompanyId = companyId, Name = "Media", SortOrder = 2, IsActive = isActive };
-
-    private static Status CreateStatus(Guid companyId, bool isActive = true) =>
-        new()
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = companyId,
-            Name = "Nuevo",
-            SortOrder = 1,
-            IsActive = isActive,
-            IsClosed = false
-        };
 }

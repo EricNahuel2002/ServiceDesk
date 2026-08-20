@@ -32,7 +32,29 @@ public interface ITicketRepository
         Guid companyId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Ticket>> GetSlaTrackedTicketsAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Ticket>> GetAssignedUnstartedTicketsAsync(CancellationToken cancellationToken = default);
+
+    Task<TicketSlaRecord?> GetCurrentSlaRecordAsync(Guid ticketId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsByTicketIdsAsync(
+        IReadOnlyCollection<Guid> ticketIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsByIdsAsync(
+        IReadOnlyCollection<Guid> recordIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TicketSlaRecord>> GetCanceledSlaRecordsPendingNotificationAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsPendingAdminReassignmentNotificationAsync(
+        CancellationToken cancellationToken = default);
+
     void Add(Ticket ticket);
+
+    void AddSlaRecord(TicketSlaRecord record);
 
     void AddComment(TicketComment comment);
 }

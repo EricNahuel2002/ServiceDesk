@@ -207,40 +207,6 @@ namespace ServiceDesk.Infrastructure.Migrations
                     b.ToTable("Categories");
                 });
 
-            modelBuilder.Entity("ServiceDesk.Domain.Catalog.Priority", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId", "Name")
-                        .IsUnique();
-
-                    b.ToTable("Priorities");
-                });
-
             modelBuilder.Entity("ServiceDesk.Domain.Catalog.Status", b =>
                 {
                     b.Property<Guid>("Id")
@@ -481,11 +447,119 @@ namespace ServiceDesk.Infrastructure.Migrations
                     b.ToTable("RefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("ServiceDesk.Domain.Sla.CompanyBusinessHours", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BusinessHoursJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("MaxAssignmentToStartMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("UseBusinessHours")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique();
+
+                    b.ToTable("CompanyBusinessHours");
+                });
+
+            modelBuilder.Entity("ServiceDesk.Domain.Sla.SlaConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ResponseTimeHours")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Priority")
+                        .IsUnique();
+
+                    b.ToTable("SlaConfigurations");
+                });
+
+            modelBuilder.Entity("ServiceDesk.Domain.Tickets.ChatMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReadAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("SentAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SenderId");
+
+                    b.HasIndex("TicketId");
+
+                    b.ToTable("ChatMessages");
+                });
+
             modelBuilder.Entity("ServiceDesk.Domain.Tickets.Ticket", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("AssignedAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<Guid?>("AssignedToId")
                         .HasColumnType("uniqueidentifier");
@@ -506,10 +580,16 @@ namespace ServiceDesk.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("PriorityId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int?>("Priority")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ResponseDeadlineAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("StartedWorkAtUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<Guid>("StatusId")
@@ -533,7 +613,7 @@ namespace ServiceDesk.Infrastructure.Migrations
 
                     b.HasIndex("CreatedById");
 
-                    b.HasIndex("PriorityId");
+                    b.HasIndex("Priority");
 
                     b.HasIndex("StatusId");
 
@@ -591,7 +671,7 @@ namespace ServiceDesk.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("AuthorId")
+                    b.Property<Guid?>("AuthorId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Body")
@@ -617,6 +697,73 @@ namespace ServiceDesk.Infrastructure.Migrations
                     b.HasIndex("TicketId");
 
                     b.ToTable("TicketComments");
+                });
+
+            modelBuilder.Entity("ServiceDesk.Domain.Tickets.TicketSlaRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("AdminReassignmentNotifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("BreachedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("BreachedNotifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CanceledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CanceledNotifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CanceledReason")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpiringNotifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("GraceDeadlineUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ResponseDeadlineAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SlaLimitHours")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("TechnicianId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CanceledReason");
+
+                    b.HasIndex("IsCurrent");
+
+                    b.HasIndex("TechnicianId");
+
+                    b.HasIndex("TicketId");
+
+                    b.ToTable("TicketSlaRecords");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -699,17 +846,6 @@ namespace ServiceDesk.Infrastructure.Migrations
                     b.Navigation("Company");
                 });
 
-            modelBuilder.Entity("ServiceDesk.Domain.Catalog.Priority", b =>
-                {
-                    b.HasOne("ServiceDesk.Domain.Companies.Company", "Company")
-                        .WithMany("Priorities")
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Company");
-                });
-
             modelBuilder.Entity("ServiceDesk.Domain.Catalog.Status", b =>
                 {
                     b.HasOne("ServiceDesk.Domain.Companies.Company", "Company")
@@ -743,6 +879,47 @@ namespace ServiceDesk.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("ServiceDesk.Domain.Sla.CompanyBusinessHours", b =>
+                {
+                    b.HasOne("ServiceDesk.Domain.Companies.Company", "Company")
+                        .WithOne("BusinessHours")
+                        .HasForeignKey("ServiceDesk.Domain.Sla.CompanyBusinessHours", "CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("ServiceDesk.Domain.Sla.SlaConfiguration", b =>
+                {
+                    b.HasOne("ServiceDesk.Domain.Companies.Company", "Company")
+                        .WithMany("SlaConfigurations")
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("ServiceDesk.Domain.Tickets.ChatMessage", b =>
+                {
+                    b.HasOne("ServiceDesk.Domain.Identity.ApplicationUser", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ServiceDesk.Domain.Tickets.Ticket", "Ticket")
+                        .WithMany()
+                        .HasForeignKey("TicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Sender");
+
+                    b.Navigation("Ticket");
+                });
+
             modelBuilder.Entity("ServiceDesk.Domain.Tickets.Ticket", b =>
                 {
                     b.HasOne("ServiceDesk.Domain.Identity.ApplicationUser", "AssignedTo")
@@ -768,12 +945,6 @@ namespace ServiceDesk.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ServiceDesk.Domain.Catalog.Priority", "Priority")
-                        .WithMany("Tickets")
-                        .HasForeignKey("PriorityId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("ServiceDesk.Domain.Catalog.Status", "Status")
                         .WithMany("Tickets")
                         .HasForeignKey("StatusId")
@@ -787,8 +958,6 @@ namespace ServiceDesk.Infrastructure.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("CreatedBy");
-
-                    b.Navigation("Priority");
 
                     b.Navigation("Status");
                 });
@@ -817,8 +986,7 @@ namespace ServiceDesk.Infrastructure.Migrations
                     b.HasOne("ServiceDesk.Domain.Identity.ApplicationUser", "Author")
                         .WithMany("Comments")
                         .HasForeignKey("AuthorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("ServiceDesk.Domain.Tickets.Ticket", "Ticket")
                         .WithMany("Comments")
@@ -831,12 +999,18 @@ namespace ServiceDesk.Infrastructure.Migrations
                     b.Navigation("Ticket");
                 });
 
-            modelBuilder.Entity("ServiceDesk.Domain.Catalog.Category", b =>
+            modelBuilder.Entity("ServiceDesk.Domain.Tickets.TicketSlaRecord", b =>
                 {
-                    b.Navigation("Tickets");
+                    b.HasOne("ServiceDesk.Domain.Tickets.Ticket", "Ticket")
+                        .WithMany("SlaRecords")
+                        .HasForeignKey("TicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ticket");
                 });
 
-            modelBuilder.Entity("ServiceDesk.Domain.Catalog.Priority", b =>
+            modelBuilder.Entity("ServiceDesk.Domain.Catalog.Category", b =>
                 {
                     b.Navigation("Tickets");
                 });
@@ -850,9 +1024,11 @@ namespace ServiceDesk.Infrastructure.Migrations
                 {
                     b.Navigation("AuditLogs");
 
+                    b.Navigation("BusinessHours");
+
                     b.Navigation("Categories");
 
-                    b.Navigation("Priorities");
+                    b.Navigation("SlaConfigurations");
 
                     b.Navigation("Statuses");
 
@@ -879,6 +1055,8 @@ namespace ServiceDesk.Infrastructure.Migrations
                     b.Navigation("Attachments");
 
                     b.Navigation("Comments");
+
+                    b.Navigation("SlaRecords");
                 });
 #pragma warning restore 612, 618
         }

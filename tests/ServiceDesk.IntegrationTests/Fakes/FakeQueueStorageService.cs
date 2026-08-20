@@ -7,6 +7,7 @@ public sealed class FakeQueueStorageService : IQueueStorageService
 {
     private readonly ConcurrentQueue<string> _messages = new();
     private readonly ConcurrentQueue<string> _clientMessages = new();
+    private readonly ConcurrentQueue<string> _clientWorkMessages = new();
 
     public Task EnqueueAsync(string message, CancellationToken cancellationToken = default)
     {
@@ -22,13 +23,23 @@ public sealed class FakeQueueStorageService : IQueueStorageService
         return Task.CompletedTask;
     }
 
+    public Task EnqueueClientWorkNotificationAsync(string message, CancellationToken cancellationToken = default)
+    {
+        _clientWorkMessages.Enqueue(message);
+
+        return Task.CompletedTask;
+    }
+
     public IReadOnlyList<string> Messages => _messages.ToArray();
 
     public IReadOnlyList<string> ClientMessages => _clientMessages.ToArray();
+
+    public IReadOnlyList<string> ClientWorkMessages => _clientWorkMessages.ToArray();
 
     public void Clear()
     {
         _messages.Clear();
         _clientMessages.Clear();
+        _clientWorkMessages.Clear();
     }
 }

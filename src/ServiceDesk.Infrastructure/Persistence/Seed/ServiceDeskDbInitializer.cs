@@ -1,11 +1,14 @@
 using System.Linq.Expressions;
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Common;
 using ServiceDesk.Domain.Companies;
+using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
+using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Infrastructure.Persistence.Seed;
@@ -16,6 +19,11 @@ public sealed class ServiceDeskDbInitializer
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly ILogger<ServiceDeskDbInitializer> _logger;
+
+    private static readonly JsonSerializerOptions BusinessHoursJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     public ServiceDeskDbInitializer(
         ServiceDeskDbContext context,
@@ -39,6 +47,10 @@ public sealed class ServiceDeskDbInitializer
         {
             await SeedCompanyAsync(cancellationToken);
         }
+
+        await EnsureSlaConfigurationsAsync(cancellationToken);
+
+        await EnsureBusinessHoursAsync(cancellationToken);
 
         await SeedDemoUsersAsync(cancellationToken);
 
@@ -77,18 +89,100 @@ public sealed class ServiceDeskDbInitializer
             CreateCategory(company, "Red"),
             CreateCategory(company, "Acceso y Cuentas"));
 
-        _context.Priorities.AddRange(
-            CreatePriority(company, "Baja", 1),
-            CreatePriority(company, "Media", 2),
-            CreatePriority(company, "Alta", 3),
-            CreatePriority(company, "Urgente", 4));
-
         _context.Statuses.AddRange(
             CreateStatus(company, "Nuevo", 1),
             CreateStatus(company, "En Progreso", 2),
             CreateStatus(company, "En Espera", 3),
             CreateStatus(company, "Resuelto", 4, isClosed: true),
             CreateStatus(company, "Cerrado", 5, isClosed: true));
+
+        _context.SlaConfigurations.AddRange(
+            new SlaConfiguration { CompanyId = company.Id, Priority = TicketPriority.Baja, ResponseTimeHours = 8 },
+            new SlaConfiguration { CompanyId = company.Id, Priority = TicketPriority.Media, ResponseTimeHours = 4 },
+            new SlaConfiguration { CompanyId = company.Id, Priority = TicketPriority.Alta, ResponseTimeHours = 2 },
+            new SlaConfiguration { CompanyId = company.Id, Priority = TicketPriority.Critica, ResponseTimeHours = 1 });
+
+        string businessHoursJson = JsonSerializer.Serialize(new Dictionary<string, DaySchedule>
+        {
+            ["Monday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Tuesday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Wednesday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Thursday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Friday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Saturday"] = new() { Enabled = false },
+            ["Sunday"] = new() { Enabled = false }
+        }, BusinessHoursJsonOptions);
+
+        _context.CompanyBusinessHours.Add(new CompanyBusinessHours
+        {
+            CompanyId = company.Id,
+            TimeZoneId = "Argentina Standard Time",
+            BusinessHoursJson = businessHoursJson,
+            UseBusinessHours = true,
+            MaxAssignmentToStartMinutes = 120
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureSlaConfigurationsAsync(CancellationToken cancellationToken)
+    {
+        Guid companyId = await _context.Companies
+            .OrderBy(c => c.CreatedAtUtc)
+            .Select(c => c.Id)
+            .FirstAsync(cancellationToken);
+
+        bool hasSlaConfigs = await _context.SlaConfigurations
+            .AnyAsync(s => s.CompanyId == companyId, cancellationToken);
+
+        if (hasSlaConfigs)
+        {
+            return;
+        }
+
+        _context.SlaConfigurations.AddRange(
+            new SlaConfiguration { CompanyId = companyId, Priority = TicketPriority.Baja, ResponseTimeHours = 8 },
+            new SlaConfiguration { CompanyId = companyId, Priority = TicketPriority.Media, ResponseTimeHours = 4 },
+            new SlaConfiguration { CompanyId = companyId, Priority = TicketPriority.Alta, ResponseTimeHours = 2 },
+            new SlaConfiguration { CompanyId = companyId, Priority = TicketPriority.Critica, ResponseTimeHours = 1 });
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureBusinessHoursAsync(CancellationToken cancellationToken)
+    {
+        Guid companyId = await _context.Companies
+            .OrderBy(c => c.CreatedAtUtc)
+            .Select(c => c.Id)
+            .FirstAsync(cancellationToken);
+
+        bool hasBusinessHours = await _context.CompanyBusinessHours
+            .AnyAsync(b => b.CompanyId == companyId, cancellationToken);
+
+        if (hasBusinessHours)
+        {
+            return;
+        }
+
+        string businessHoursJson = JsonSerializer.Serialize(new Dictionary<string, DaySchedule>
+        {
+            ["Monday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Tuesday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Wednesday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Thursday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Friday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
+            ["Saturday"] = new() { Enabled = false },
+            ["Sunday"] = new() { Enabled = false }
+        }, BusinessHoursJsonOptions);
+
+        _context.CompanyBusinessHours.Add(new CompanyBusinessHours
+        {
+            CompanyId = companyId,
+            TimeZoneId = "Argentina Standard Time",
+            BusinessHoursJson = businessHoursJson,
+            UseBusinessHours = true,
+            MaxAssignmentToStartMinutes = 120
+        });
 
         await _context.SaveChangesAsync(cancellationToken);
     }
@@ -159,21 +253,6 @@ public sealed class ServiceDeskDbInitializer
             category => category.CompanyId == company.Id && category.Name == "Red",
             cancellationToken);
 
-        Guid bajaId = await FindCatalogIdAsync(
-            _context.Priorities,
-            priority => priority.CompanyId == company.Id && priority.Name == "Baja",
-            cancellationToken);
-
-        Guid mediaId = await FindCatalogIdAsync(
-            _context.Priorities,
-            priority => priority.CompanyId == company.Id && priority.Name == "Media",
-            cancellationToken);
-
-        Guid altaId = await FindCatalogIdAsync(
-            _context.Priorities,
-            priority => priority.CompanyId == company.Id && priority.Name == "Alta",
-            cancellationToken);
-
         Guid nuevoId = await FindCatalogIdAsync(
             _context.Statuses,
             status => status.CompanyId == company.Id && status.Name == "Nuevo",
@@ -189,42 +268,52 @@ public sealed class ServiceDeskDbInitializer
             status => status.CompanyId == company.Id && status.Name == "Resuelto",
             cancellationToken);
 
+        DateTime now = DateTime.UtcNow;
+
         _context.Tickets.AddRange(
             CreateTicket(
                 company.Id,
                 cliente.Id,
                 hardwareId,
-                mediaId,
+                null,
                 nuevoId,
                 "PC no enciende",
-                "La PC de recepción no enciende desde esta mañana."),
+                "La PC de recepción no enciende desde esta mañana.",
+                responseDeadline: now.AddHours(4)),
             CreateTicket(
                 company.Id,
                 cliente.Id,
                 redId,
-                altaId,
+                TicketPriority.Alta,
                 enProgresoId,
                 "VPN no funciona",
                 "No puedo conectarme a la VPN desde casa.",
-                assignedToId: tecnico.Id),
+                assignedToId: tecnico.Id,
+                assignedAtUtc: now.AddHours(-1),
+                responseDeadline: now.AddHours(2),
+                startedWorkAt: now.AddMinutes(-30)),
             CreateTicket(
                 company.Id,
                 cliente.Id,
                 hardwareId,
-                mediaId,
+                TicketPriority.Media,
                 resueltoId,
                 "Impresora no imprime",
                 "La impresora del piso 3 quedó con un atasco de papel.",
                 assignedToId: tecnico.Id,
-                resolved: true),
+                assignedAtUtc: now.AddHours(-2),
+                resolved: true,
+                responseDeadline: now.AddHours(4),
+                startedWorkAt: now.AddMinutes(-60)),
             CreateTicket(
                 company.Id,
                 cliente.Id,
                 softwareId,
-                bajaId,
+                null,
                 nuevoId,
                 "Solicitud de licencia",
-                "Necesito una licencia de Microsoft 365 para el equipo de ventas."));
+                "Necesito una licencia de Microsoft 365 para el equipo de ventas.",
+                responseDeadline: now.AddHours(8)));
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -266,23 +355,29 @@ public sealed class ServiceDeskDbInitializer
         Guid companyId,
         Guid createdById,
         Guid categoryId,
-        Guid priorityId,
+        TicketPriority? priority,
         Guid statusId,
         string title,
         string description,
+        DateTime responseDeadline,
         Guid? assignedToId = null,
-        bool resolved = false) =>
+        DateTime? assignedAtUtc = null,
+        bool resolved = false,
+        DateTime? startedWorkAt = null) =>
         new()
         {
             Id = Guid.NewGuid(),
             CompanyId = companyId,
             CreatedById = createdById,
             CategoryId = categoryId,
-            PriorityId = priorityId,
+            Priority = priority,
             StatusId = statusId,
             Title = title,
             Description = description,
             AssignedToId = assignedToId,
+            AssignedAtUtc = assignedAtUtc,
+            ResponseDeadlineAtUtc = responseDeadline,
+            StartedWorkAtUtc = startedWorkAt,
             ResolvedAtUtc = resolved ? DateTime.UtcNow : null
         };
 
@@ -335,9 +430,6 @@ public sealed class ServiceDeskDbInitializer
 
     private static Category CreateCategory(Company company, string name) =>
         new() { CompanyId = company.Id, Name = name, IsActive = true };
-
-    private static Priority CreatePriority(Company company, string name, int sortOrder) =>
-        new() { CompanyId = company.Id, Name = name, SortOrder = sortOrder, IsActive = true };
 
     private static Status CreateStatus(Company company, string name, int sortOrder, bool isClosed = false) =>
         new() { CompanyId = company.Id, Name = name, SortOrder = sortOrder, IsClosed = isClosed, IsActive = true };

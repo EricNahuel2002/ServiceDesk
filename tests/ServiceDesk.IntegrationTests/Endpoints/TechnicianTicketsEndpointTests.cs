@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using ServiceDesk.Application.DTOs.Tickets;
+using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
 
 namespace ServiceDesk.IntegrationTests.Endpoints;
@@ -202,6 +203,26 @@ public sealed class TechnicianTicketsEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task StartWork_Returns200_AndSetsStartedWorkAtUtc()
+    {
+        await _factory.ResetTicketsAsync();
+        (Guid companyId, _, Guid technicianId, _) = await GetSeedAsync();
+        Guid ticketId = await CreateSeedCompanyTicketAsync("Para iniciar", "Técnico asignado", assignedToId: technicianId);
+
+        using HttpClient client = await _factory.CreateClientForRoleAsync(Roles.Tecnico);
+
+        HttpResponseMessage response = await client.PatchAsJsonAsync(
+            $"/api/technician/tickets/{ticketId}/start-work",
+            new { });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        TicketDto? ticket = await response.Content.ReadFromJsonAsync<TicketDto>();
+        Assert.NotNull(ticket);
+        Assert.NotNull(ticket.StartedWorkAtUtc);
+        Assert.Equal("En Progreso", ticket.StatusName);
+    }
+
     private async Task<(Guid CompanyId, Guid AdminId, Guid TechnicianId, Guid ClientId)> GetSeedAsync()
     {
         Guid companyId = await _factory.GetCompanyIdAsync(CustomWebApplicationFactory.SeedCompanyName);
@@ -211,14 +232,6 @@ public sealed class TechnicianTicketsEndpointTests
         return (companyId, adminId, technicianId, clientId);
     }
 
-    private async Task<(Guid CategoryId, Guid PriorityId, Guid StatusId)> GetCatalogAsync(Guid companyId)
-    {
-        Guid categoryId = await _factory.GetCategoryIdAsync(companyId, "Hardware");
-        Guid priorityId = await _factory.GetPriorityIdAsync(companyId, "Media");
-        Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
-        return (categoryId, priorityId, statusId);
-    }
-
     private async Task<Guid> CreateSeedCompanyTicketAsync(
         string title,
         string description,
@@ -226,11 +239,12 @@ public sealed class TechnicianTicketsEndpointTests
         Guid? statusId = null)
     {
         (Guid companyId, Guid adminId, _, _) = await GetSeedAsync();
-        (Guid categoryId, Guid priorityId, Guid defaultStatusId) = await GetCatalogAsync(companyId);
+        Guid categoryId = await _factory.GetCategoryIdAsync(companyId, "Hardware");
+        Guid defaultStatusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
         return await _factory.CreateTicketAsync(
             companyId,
             categoryId,
-            priorityId,
+            TicketPriority.Media,
             statusId ?? defaultStatusId,
             adminId,
             title,
@@ -242,7 +256,8 @@ public sealed class TechnicianTicketsEndpointTests
     {
         Guid otherCompanyId = await _factory.CreateCompanyAsync("Competencia S.A.");
         await _factory.CreateCatalogAsync(otherCompanyId);
-        (Guid categoryId, Guid priorityId, Guid statusId) = await GetCatalogAsync(otherCompanyId);
+        Guid categoryId = await _factory.GetCategoryIdAsync(otherCompanyId, "Hardware");
+        Guid statusId = await _factory.GetStatusIdAsync(otherCompanyId, "Nuevo");
         Guid otherTechnicianId = await _factory.CreateUserAsync(
             $"tecnico-{Guid.NewGuid():N}@competencia.local",
             "Técnico",
@@ -253,7 +268,7 @@ public sealed class TechnicianTicketsEndpointTests
         return await _factory.CreateTicketAsync(
             otherCompanyId,
             categoryId,
-            priorityId,
+            TicketPriority.Media,
             statusId,
             otherTechnicianId,
             "Ticket ajeno",

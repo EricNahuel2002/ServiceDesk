@@ -14,15 +14,34 @@ using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Common;
 using ServiceDesk.Domain.Companies;
+using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
+using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
 using ServiceDesk.Infrastructure.Persistence;
 using ServiceDesk.IntegrationTests.Fakes;
 
 namespace ServiceDesk.IntegrationTests;
 
-public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
+public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public async Task InitializeAsync()
+    {
+        await DisableBusinessHoursForSeedCompanyAsync();
+    }
+
+    Task IAsyncLifetime.DisposeAsync() => base.DisposeAsync().AsTask();
+
+    private async Task DisableBusinessHoursForSeedCompanyAsync()
+    {
+        Guid companyId = await GetCompanyIdAsync(SeedCompanyName);
+        using IServiceScope scope = Services.CreateScope();
+        ServiceDeskDbContext context = scope.ServiceProvider.GetRequiredService<ServiceDeskDbContext>();
+        CompanyBusinessHours businessHours = await context.CompanyBusinessHours
+            .SingleAsync(b => b.CompanyId == companyId);
+        businessHours.UseBusinessHours = false;
+        await context.SaveChangesAsync();
+    }
     private const string DefaultTestConnectionString =
         "Server=.\\SQLEXPRESS;Database=ServiceDesk_Test;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true";
 
@@ -156,9 +175,6 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     public Task<Guid> GetCategoryIdAsync(Guid companyId, string name) =>
         GetEntityIdAsync(context => context.Categories, c => c.CompanyId == companyId && c.Name == name);
 
-    public Task<Guid> GetPriorityIdAsync(Guid companyId, string name) =>
-        GetEntityIdAsync(context => context.Priorities, p => p.CompanyId == companyId && p.Name == name);
-
     public Task<Guid> GetStatusIdAsync(Guid companyId, string name) =>
         GetEntityIdAsync(context => context.Statuses, s => s.CompanyId == companyId && s.Name == name);
 
@@ -235,7 +251,6 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         ServiceDeskDbContext context = scope.ServiceProvider.GetRequiredService<ServiceDeskDbContext>();
 
         context.Categories.Add(new Category { Id = Guid.NewGuid(), CompanyId = companyId, Name = "Hardware", IsActive = true });
-        context.Priorities.Add(new Priority { Id = Guid.NewGuid(), CompanyId = companyId, Name = "Media", SortOrder = 2, IsActive = true });
         context.Statuses.Add(new Status { Id = Guid.NewGuid(), CompanyId = companyId, Name = "Nuevo", SortOrder = 1, IsActive = true });
         await context.SaveChangesAsync();
     }
@@ -311,7 +326,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     public async Task<Guid> CreateTicketAsync(
         Guid companyId,
         Guid categoryId,
-        Guid priorityId,
+        TicketPriority priority,
         Guid statusId,
         Guid createdById,
         string title,
@@ -327,12 +342,13 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             Id = Guid.NewGuid(),
             CompanyId = companyId,
             CategoryId = categoryId,
-            PriorityId = priorityId,
+            Priority = priority,
             StatusId = statusId,
             CreatedById = createdById,
             AssignedToId = assignedToId,
             Title = title,
-            Description = description
+            Description = description,
+            ResponseDeadlineAtUtc = DateTime.UtcNow.AddHours(4)
         };
 
         context.Tickets.Add(ticket);

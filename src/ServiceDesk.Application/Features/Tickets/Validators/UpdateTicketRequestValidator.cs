@@ -8,12 +8,17 @@ public sealed class UpdateTicketRequestValidator : AbstractValidator<UpdateTicke
     public UpdateTicketRequestValidator()
     {
         RuleFor(x => x.AssignedToId)
-            .NotEqual(Guid.Empty);
+            .NotEmpty()
+            .When(x => x.AssignedToId.HasValue)
+            .WithMessage("El técnico asignado no puede ser un GUID vacío.");
 
-        RuleFor(x => x.PriorityId)
-            .NotEqual(Guid.Empty);
+        RuleFor(x => x.Priority)
+            .IsInEnum()
+            .When(x => x.Priority.HasValue)
+            .WithMessage("La prioridad indicada no es válida.");
 
-        RuleFor(x => x.StatusId)
-            .NotEqual(Guid.Empty);
+        RuleFor(x => x)
+            .Must(x => x.AssignedToId.HasValue || x.Priority.HasValue)
+            .WithMessage("Debe indicar al menos un campo para actualizar (AssignedToId o Priority).");
     }
 }

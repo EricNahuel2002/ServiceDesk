@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
 using ServiceDesk.Domain.Tickets;
 using ServiceDesk.Infrastructure.Persistence;
@@ -58,8 +59,9 @@ public sealed class DbConnectionTests
             }
 
             Assert.True(await context.Categories.AnyAsync());
-            Assert.True(await context.Priorities.AnyAsync());
             Assert.True(await context.Statuses.AnyAsync());
+            Assert.True(await context.SlaConfigurations.AnyAsync());
+            Assert.True(await context.CompanyBusinessHours.AnyAsync());
         }
     }
 
@@ -70,7 +72,6 @@ public sealed class DbConnectionTests
 
         Guid companyId = await _factory.GetCompanyIdAsync(CustomWebApplicationFactory.SeedCompanyName);
         Guid categoryId = await _factory.GetCategoryIdAsync(companyId, "Hardware");
-        Guid priorityId = await _factory.GetPriorityIdAsync(companyId, "Media");
         Guid statusId = await _factory.GetStatusIdAsync(companyId, "Nuevo");
         Guid createdBy = await _factory.GetUserIdByEmailAsync(CustomWebApplicationFactory.AdminEmail);
 
@@ -82,11 +83,12 @@ public sealed class DbConnectionTests
                 Id = Guid.NewGuid(),
                 CompanyId = companyId,
                 CategoryId = categoryId,
-                PriorityId = priorityId,
+                Priority = TicketPriority.Media,
                 StatusId = statusId,
                 CreatedById = createdBy,
                 Title = "Roundtrip",
-                Description = "Descripción del roundtrip"
+                Description = "Descripción del roundtrip",
+                ResponseDeadlineAtUtc = DateTime.UtcNow.AddHours(4)
             };
 
             context.Tickets.Add(ticket);

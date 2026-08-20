@@ -21,52 +21,11 @@ public sealed class CatalogVerificationService : ICatalogVerificationService
     {
         Category? category = await _catalog.GetCategoryByIdAsync(categoryId, cancellationToken);
 
-        if (!IsAvailableForCompany(category, _currentUser.CompanyId))
+        if (category is null || !category.IsActive || category.CompanyId != _currentUser.CompanyId)
         {
             ThrowInvalidCatalogItem("CategoryId");
         }
     }
-
-    public async Task EnsurePriorityBelongsToCompanyAsync(
-        Guid priorityId,
-        CancellationToken cancellationToken)
-    {
-        Priority? priority = await _catalog.GetPriorityByIdAsync(priorityId, cancellationToken);
-
-        if (!IsAvailableForCompany(priority, _currentUser.CompanyId))
-        {
-            ThrowInvalidCatalogItem("PriorityId");
-        }
-    }
-
-    public async Task<Status> EnsureStatusBelongsToCompanyAsync(
-        Guid statusId,
-        CancellationToken cancellationToken)
-    {
-        Status? status = await _catalog.GetStatusByIdAsync(statusId, cancellationToken);
-
-        if (!IsAvailableForCompany(status, _currentUser.CompanyId))
-        {
-            ThrowInvalidCatalogItem("StatusId");
-        }
-
-        return status!;
-    }
-
-    private static bool IsAvailableForCompany(Category? item, Guid companyId) =>
-        item is not null
-        && item.IsActive
-        && CompanyCatalogPolicy.BelongsToCompany(item, companyId);
-
-    private static bool IsAvailableForCompany(Priority? item, Guid companyId) =>
-        item is not null
-        && item.IsActive
-        && CompanyCatalogPolicy.BelongsToCompany(item, companyId);
-
-    private static bool IsAvailableForCompany(Status? item, Guid companyId) =>
-        item is not null
-        && item.IsActive
-        && CompanyCatalogPolicy.BelongsToCompany(item, companyId);
 
     private static void ThrowInvalidCatalogItem(string propertyName) =>
         throw new ValidationException(new Dictionary<string, string[]>
