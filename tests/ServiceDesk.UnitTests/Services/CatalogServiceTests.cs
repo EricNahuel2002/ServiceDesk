@@ -67,74 +67,6 @@ public sealed class CatalogServiceTests
         Assert.Equal(["Alpha", "Mid", "Zebra"], categories.Select(category => category.Name));
     }
 
-    [Fact]
-    public async Task GetStatusesAsync_ReturnsOnlyActiveStatusesOfCurrentCompany()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Guid otherCompanyId = Guid.NewGuid();
-
-        context.Statuses.AddRange(
-            CreateStatus(CompanyId, "Nuevo", 1),
-            CreateStatus(CompanyId, "En Progreso", 2),
-            CreateStatus(CompanyId, "Cerrado", 5, isActive: false),
-            CreateStatus(otherCompanyId, "Interno", 1));
-
-        await context.SaveChangesAsync();
-
-        ICatalogService service = CreateService(context);
-
-        IReadOnlyList<StatusDto> statuses = await service.GetStatusesAsync();
-
-        Assert.Equal(2, statuses.Count);
-        Assert.Equal(["Nuevo", "En Progreso"], statuses.Select(status => status.Name));
-    }
-
-    [Fact]
-    public async Task GetStatusesAsync_ReturnsEmpty_WhenCompanyHasNoStatuses()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        context.Statuses.Add(CreateStatus(Guid.NewGuid(), "Interno", 1));
-        await context.SaveChangesAsync();
-
-        ICatalogService service = CreateService(context);
-
-        IReadOnlyList<StatusDto> statuses = await service.GetStatusesAsync();
-
-        Assert.Empty(statuses);
-    }
-
-    [Fact]
-    public async Task GetStatusesAsync_ReturnsStatusesOrderedBySortOrder()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        context.Statuses.AddRange(
-            CreateStatus(CompanyId, "Resuelto", 4),
-            CreateStatus(CompanyId, "Nuevo", 1),
-            CreateStatus(CompanyId, "En Espera", 3));
-        await context.SaveChangesAsync();
-
-        ICatalogService service = CreateService(context);
-
-        IReadOnlyList<StatusDto> statuses = await service.GetStatusesAsync();
-
-        Assert.Equal(["Nuevo", "En Espera", "Resuelto"], statuses.Select(status => status.Name));
-    }
-
-    [Fact]
-    public async Task GetStatusesAsync_ReturnsClosedFlag()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        context.Statuses.Add(CreateStatus(CompanyId, "Cerrado", 5, isClosed: true));
-        await context.SaveChangesAsync();
-
-        ICatalogService service = CreateService(context);
-
-        IReadOnlyList<StatusDto> statuses = await service.GetStatusesAsync();
-
-        StatusDto status = Assert.Single(statuses);
-        Assert.True(status.IsClosed);
-    }
-
     private static ServiceDeskDbContext CreateContext()
     {
         DbContextOptions<ServiceDeskDbContext> options = new DbContextOptionsBuilder<ServiceDeskDbContext>()
@@ -154,20 +86,4 @@ public sealed class CatalogServiceTests
 
     private static Category CreateCategory(Guid companyId, string name, bool isActive = true) =>
         new() { Id = Guid.NewGuid(), CompanyId = companyId, Name = name, IsActive = isActive };
-
-    private static Status CreateStatus(
-        Guid companyId,
-        string name,
-        int sortOrder,
-        bool isActive = true,
-        bool isClosed = false) =>
-        new()
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = companyId,
-            Name = name,
-            SortOrder = sortOrder,
-            IsActive = isActive,
-            IsClosed = isClosed
-        };
 }

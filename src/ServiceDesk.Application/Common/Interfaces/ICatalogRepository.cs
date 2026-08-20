@@ -7,19 +7,15 @@ public interface ICatalogRepository
 {
     Task<IReadOnlyList<CategoryDto>> GetActiveCategoriesAsync(Guid companyId, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<StatusDto>> GetActiveStatusesAsync(Guid companyId, CancellationToken cancellationToken = default);
-
     Task<IReadOnlyList<CategoryDto>> GetAllCategoriesAsync(Guid companyId, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<StatusDto>> GetAllStatusesAsync(Guid companyId, CancellationToken cancellationToken = default);
-
     Task<Category?> GetCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default);
-
-    Task<Status?> GetStatusByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<Guid?> FindInitialStatusIdAsync(Guid companyId, CancellationToken cancellationToken = default);
 
     Task<Guid?> FindFirstClosedStatusIdAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    Task<Guid?> FindStatusByNameAsync(Guid companyId, string name, CancellationToken cancellationToken = default);
 
     Task AddCategoryAsync(Category category, CancellationToken cancellationToken = default);
 

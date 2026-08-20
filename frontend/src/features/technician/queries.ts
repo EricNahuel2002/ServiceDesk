@@ -1,6 +1,5 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useStatuses } from '../catalog/queries'
 import { getAssignedTickets, startWork, resolveTicket } from './api'
 import type { TicketDto } from '../tickets/types'
 
@@ -45,22 +44,10 @@ export function useResolveTicket() {
 }
 
 export function useIsTechnicianTicketClosed() {
-  const statuses = useStatuses()
-
-  const closedStatusIds = useMemo(
-    () =>
-      new Set(
-        (statuses.data ?? [])
-          .filter((status) => status.isClosed)
-          .map((status) => status.id),
-      ),
-    [statuses.data],
-  )
-
   const isClosed = useCallback(
-    (ticket: TicketDto) => closedStatusIds.has(ticket.statusId),
-    [closedStatusIds],
+    (ticket: TicketDto) => ticket.resolvedAtUtc !== null,
+    [],
   )
 
-  return { isClosed, statusesPending: statuses.isPending }
+  return { isClosed }
 }

@@ -1,6 +1,5 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useStatuses } from '../catalog/queries'
 import {
   getAllTickets,
   getTicketById,
@@ -13,12 +12,18 @@ import {
   getAllUsers,
   createUser,
   getMetrics,
+  getSlaConfigurations,
+  updateSlaConfiguration,
+  getBusinessHours,
+  updateBusinessHours,
 } from './api'
 import type { TicketDto, UpdateTicketRequest, AssignTicketRequest } from '../tickets/types'
 import type {
   CreateCategoryRequest,
   UpdateCategoryRequest,
   CreateUserRequest,
+  UpdateSlaConfigurationRequest,
+  UpdateBusinessHoursRequest,
 } from './types'
 
 export function useAdminTickets() {
@@ -64,24 +69,12 @@ export function useAssignTicket() {
 }
 
 export function useIsTicketClosed() {
-  const statuses = useStatuses()
-
-  const closedStatusIds = useMemo(
-    () =>
-      new Set(
-        (statuses.data ?? [])
-          .filter((status) => status.isClosed)
-          .map((status) => status.id),
-      ),
-    [statuses.data],
-  )
-
   const isClosed = useCallback(
-    (ticket: TicketDto) => closedStatusIds.has(ticket.statusId),
-    [closedStatusIds],
+    (ticket: TicketDto) => ticket.resolvedAtUtc !== null,
+    [],
   )
 
-  return { isClosed, statusesPending: statuses.isPending }
+  return { isClosed }
 }
 
 export function useAdminCategories() {
@@ -127,5 +120,33 @@ export function useMetrics(params: { from?: string; to?: string; technicianId?: 
   return useQuery({
     queryKey: ['admin', 'metrics', params.from, params.to, params.technicianId, params.period],
     queryFn: () => getMetrics(params),
+  })
+}
+
+export function useSlaConfigurations() {
+  return useQuery({ queryKey: ['admin', 'sla', 'configurations'], queryFn: getSlaConfigurations })
+}
+
+export function useUpdateSlaConfiguration() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: UpdateSlaConfigurationRequest) => updateSlaConfiguration(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'sla', 'configurations'] })
+    },
+  })
+}
+
+export function useBusinessHours() {
+  return useQuery({ queryKey: ['admin', 'sla', 'business-hours'], queryFn: getBusinessHours })
+}
+
+export function useUpdateBusinessHours() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: UpdateBusinessHoursRequest) => updateBusinessHours(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'sla', 'business-hours'] })
+    },
   })
 }

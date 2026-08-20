@@ -44,15 +44,4 @@ public sealed class CatalogController : ControllerBase
 
         return Ok(priorities);
     }
-
-    [HttpGet("statuses")]
-    [ProducesResponseType(typeof(IReadOnlyList<StatusDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IReadOnlyList<StatusDto>>> GetStatuses(CancellationToken cancellationToken)
-    {
-        IReadOnlyList<StatusDto> statuses = await _catalogService.GetStatusesAsync(cancellationToken);
-
-        return Ok(statuses);
-    }
 }

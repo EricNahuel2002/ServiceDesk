@@ -15,15 +15,6 @@ public sealed class CatalogRepository : ICatalogRepository
         IsActive = category.IsActive
     };
 
-    private static readonly Expression<Func<Status, StatusDto>> StatusProjection = status => new StatusDto
-    {
-        Id = status.Id,
-        Name = status.Name,
-        SortOrder = status.SortOrder,
-        IsClosed = status.IsClosed,
-        IsActive = status.IsActive
-    };
-
     private readonly ServiceDeskDbContext _context;
 
     public CatalogRepository(ServiceDeskDbContext context)
@@ -41,23 +32,8 @@ public sealed class CatalogRepository : ICatalogRepository
             .Select(CategoryProjection)
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<StatusDto>> GetActiveStatusesAsync(
-        Guid companyId,
-        CancellationToken cancellationToken = default) =>
-        await _context.Statuses
-            .AsNoTracking()
-            .Where(status => status.CompanyId == companyId && status.IsActive)
-            .OrderBy(status => status.SortOrder)
-            .Select(StatusProjection)
-            .ToListAsync(cancellationToken);
-
     public async Task<Category?> GetCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await _context.Categories
-            .AsNoTracking()
-            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-
-    public async Task<Status?> GetStatusByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-        await _context.Statuses
             .AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
 
@@ -84,15 +60,15 @@ public sealed class CatalogRepository : ICatalogRepository
             .Select(CategoryProjection)
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<StatusDto>> GetAllStatusesAsync(
+    public async Task<Guid?> FindStatusByNameAsync(
         Guid companyId,
+        string name,
         CancellationToken cancellationToken = default) =>
         await _context.Statuses
             .AsNoTracking()
-            .Where(status => status.CompanyId == companyId)
-            .OrderBy(status => status.SortOrder)
-            .Select(StatusProjection)
-            .ToListAsync(cancellationToken);
+            .Where(status => status.CompanyId == companyId && status.Name == name && status.IsActive)
+            .Select(status => (Guid?)status.Id)
+            .SingleOrDefaultAsync(cancellationToken);
 
     public async Task AddCategoryAsync(Category category, CancellationToken cancellationToken = default)
     {

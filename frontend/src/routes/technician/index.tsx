@@ -26,7 +26,7 @@ const tabs: { id: Tab; label: string }[] = [
 
 function TechnicianDashboardPage() {
   const tickets = useTechnicianTickets()
-  const { isClosed, statusesPending } = useIsTechnicianTicketClosed()
+  const { isClosed } = useIsTechnicianTicketClosed()
   const [tab, setTab] = useState<Tab>('todos')
 
   const allTickets = tickets.data ?? []
@@ -119,7 +119,7 @@ function TechnicianDashboardPage() {
         ))}
       </div>
 
-      {tickets.isPending || statusesPending ? (
+      {tickets.isPending ? (
         <p className="text-gray-500">Cargando...</p>
       ) : filteredTickets.length === 0 ? (
         <p className="text-gray-500">No hay tickets en esta sección.</p>

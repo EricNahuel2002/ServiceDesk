@@ -33,14 +33,8 @@ public sealed class CatalogService : ICatalogService
     public Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken) =>
         _catalog.GetActiveCategoriesAsync(_currentUser.CompanyId, cancellationToken);
 
-    public Task<IReadOnlyList<StatusDto>> GetStatusesAsync(CancellationToken cancellationToken) =>
-        _catalog.GetActiveStatusesAsync(_currentUser.CompanyId, cancellationToken);
-
     public Task<IReadOnlyList<CategoryDto>> GetAllCategoriesAsync(CancellationToken cancellationToken) =>
         _catalog.GetAllCategoriesAsync(_currentUser.CompanyId, cancellationToken);
-
-    public Task<IReadOnlyList<StatusDto>> GetAllStatusesAsync(CancellationToken cancellationToken) =>
-        _catalog.GetAllStatusesAsync(_currentUser.CompanyId, cancellationToken);
 
     public async Task<CategoryDto> CreateCategoryAsync(CreateCategoryRequest request, CancellationToken cancellationToken)
     {

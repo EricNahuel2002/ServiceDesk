@@ -67,51 +67,6 @@ public sealed class CatalogVerificationServiceTests
             () => service.EnsureCategoryBelongsToCompanyAsync(Guid.NewGuid()));
     }
 
-    [Fact]
-    public async Task EnsureStatusBelongsToCompanyAsync_OwnActiveStatus_ReturnsStatus()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Status status = CreateStatus(CompanyId, isActive: true);
-        context.Statuses.Add(status);
-        await context.SaveChangesAsync();
-
-        ICatalogVerificationService service = CreateService(context);
-
-        Status validated = await service.EnsureStatusBelongsToCompanyAsync(status.Id);
-
-        Assert.Equal(status.Id, validated.Id);
-    }
-
-    [Fact]
-    public async Task EnsureStatusBelongsToCompanyAsync_StatusOfAnotherCompany_Throws()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Status status = CreateStatus(Guid.NewGuid());
-        context.Statuses.Add(status);
-        await context.SaveChangesAsync();
-
-        ICatalogVerificationService service = CreateService(context);
-
-        ValidationException exception = await Assert.ThrowsAsync<ValidationException>(
-            () => service.EnsureStatusBelongsToCompanyAsync(status.Id));
-
-        Assert.Contains("StatusId", exception.Errors.Keys);
-    }
-
-    [Fact]
-    public async Task EnsureStatusBelongsToCompanyAsync_InactiveStatus_Throws()
-    {
-        await using ServiceDeskDbContext context = CreateContext();
-        Status status = CreateStatus(CompanyId, isActive: false);
-        context.Statuses.Add(status);
-        await context.SaveChangesAsync();
-
-        ICatalogVerificationService service = CreateService(context);
-
-        await Assert.ThrowsAsync<ValidationException>(
-            () => service.EnsureStatusBelongsToCompanyAsync(status.Id));
-    }
-
     private static ServiceDeskDbContext CreateContext()
     {
         DbContextOptions<ServiceDeskDbContext> options = new DbContextOptionsBuilder<ServiceDeskDbContext>()
@@ -126,15 +81,4 @@ public sealed class CatalogVerificationServiceTests
 
     private static Category CreateCategory(Guid companyId, bool isActive = true) =>
         new() { Id = Guid.NewGuid(), CompanyId = companyId, Name = "Hardware", IsActive = isActive };
-
-    private static Status CreateStatus(Guid companyId, bool isActive = true) =>
-        new()
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = companyId,
-            Name = "Nuevo",
-            SortOrder = 1,
-            IsActive = isActive,
-            IsClosed = false
-        };
 }

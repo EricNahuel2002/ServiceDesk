@@ -19,6 +19,7 @@ import { Route as TicketsTicketIdRouteImport } from './routes/tickets/$ticketId'
 import { Route as TicketsMisTicketsRouteImport } from './routes/tickets/mis-tickets'
 import { Route as AdminCategoriesIndexRouteImport } from './routes/admin/categories/index'
 import { Route as AdminMetricsIndexRouteImport } from './routes/admin/metrics/index'
+import { Route as AdminSlaIndexRouteImport } from './routes/admin/sla/index'
 import { Route as AdminTechniciansIndexRouteImport } from './routes/admin/technicians/index'
 import { Route as AdminTicketsTicketIdRouteImport } from './routes/admin/tickets/$ticketId'
 import { Route as TechnicianTicketsTicketIdRouteImport } from './routes/technician/tickets/$ticketId'
@@ -73,6 +74,11 @@ const AdminMetricsIndexRoute = AdminMetricsIndexRouteImport.update({
   path: '/admin/metrics/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSlaIndexRoute = AdminSlaIndexRouteImport.update({
+  id: '/admin/sla/',
+  path: '/admin/sla/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminTechniciansIndexRoute = AdminTechniciansIndexRouteImport.update({
   id: '/admin/technicians/',
   path: '/admin/technicians/',
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/technician/tickets/$ticketId': typeof TechnicianTicketsTicketIdRoute
   '/admin/categories/': typeof AdminCategoriesIndexRoute
   '/admin/metrics/': typeof AdminMetricsIndexRoute
+  '/admin/sla/': typeof AdminSlaIndexRoute
   '/admin/technicians/': typeof AdminTechniciansIndexRoute
 }
 export interface FileRoutesByTo {
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/technician/tickets/$ticketId': typeof TechnicianTicketsTicketIdRoute
   '/admin/categories': typeof AdminCategoriesIndexRoute
   '/admin/metrics': typeof AdminMetricsIndexRoute
+  '/admin/sla': typeof AdminSlaIndexRoute
   '/admin/technicians': typeof AdminTechniciansIndexRoute
 }
 export interface FileRoutesById {
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/technician/tickets/$ticketId': typeof TechnicianTicketsTicketIdRoute
   '/admin/categories/': typeof AdminCategoriesIndexRoute
   '/admin/metrics/': typeof AdminMetricsIndexRoute
+  '/admin/sla/': typeof AdminSlaIndexRoute
   '/admin/technicians/': typeof AdminTechniciansIndexRoute
 }
 export interface FileRouteTypes {
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/technician/tickets/$ticketId'
     | '/admin/categories/'
     | '/admin/metrics/'
+    | '/admin/sla/'
     | '/admin/technicians/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/technician/tickets/$ticketId'
     | '/admin/categories'
     | '/admin/metrics'
+    | '/admin/sla'
     | '/admin/technicians'
   id:
     | '__root__'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/technician/tickets/$ticketId'
     | '/admin/categories/'
     | '/admin/metrics/'
+    | '/admin/sla/'
     | '/admin/technicians/'
   fileRoutesById: FileRoutesById
 }
@@ -197,6 +209,7 @@ export interface RootRouteChildren {
   TechnicianTicketsTicketIdRoute: typeof TechnicianTicketsTicketIdRoute
   AdminCategoriesIndexRoute: typeof AdminCategoriesIndexRoute
   AdminMetricsIndexRoute: typeof AdminMetricsIndexRoute
+  AdminSlaIndexRoute: typeof AdminSlaIndexRoute
   AdminTechniciansIndexRoute: typeof AdminTechniciansIndexRoute
 }
 
@@ -272,6 +285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMetricsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/sla/': {
+      id: '/admin/sla/'
+      path: '/admin/sla'
+      fullPath: '/admin/sla/'
+      preLoaderRoute: typeof AdminSlaIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/technicians/': {
       id: '/admin/technicians/'
       path: '/admin/technicians'
@@ -309,6 +329,7 @@ const rootRouteChildren: RootRouteChildren = {
   TechnicianTicketsTicketIdRoute: TechnicianTicketsTicketIdRoute,
   AdminCategoriesIndexRoute: AdminCategoriesIndexRoute,
   AdminMetricsIndexRoute: AdminMetricsIndexRoute,
+  AdminSlaIndexRoute: AdminSlaIndexRoute,
   AdminTechniciansIndexRoute: AdminTechniciansIndexRoute,
 }
 export const routeTree = rootRouteImport

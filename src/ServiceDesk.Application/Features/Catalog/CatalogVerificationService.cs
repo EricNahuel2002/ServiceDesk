@@ -27,20 +27,6 @@ public sealed class CatalogVerificationService : ICatalogVerificationService
         }
     }
 
-    public async Task<Status> EnsureStatusBelongsToCompanyAsync(
-        Guid statusId,
-        CancellationToken cancellationToken)
-    {
-        Status? status = await _catalog.GetStatusByIdAsync(statusId, cancellationToken);
-
-        if (status is null || !status.IsActive || status.CompanyId != _currentUser.CompanyId)
-        {
-            ThrowInvalidCatalogItem("StatusId");
-        }
-
-        return status!;
-    }
-
     private static void ThrowInvalidCatalogItem(string propertyName) =>
         throw new ValidationException(new Dictionary<string, string[]>
         {

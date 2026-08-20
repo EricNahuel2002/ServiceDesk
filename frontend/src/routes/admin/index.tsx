@@ -27,7 +27,7 @@ const tabs: { id: Tab; label: string }[] = [
 
 function AdminDashboardPage() {
   const tickets = useAdminTickets()
-  const { isClosed, statusesPending } = useIsTicketClosed()
+  const { isClosed } = useIsTicketClosed()
   const [tab, setTab] = useState<Tab>('todos')
 
   const allTickets = tickets.data ?? []
@@ -143,7 +143,7 @@ function AdminDashboardPage() {
         ))}
       </div>
 
-      {tickets.isPending || statusesPending ? (
+      {tickets.isPending ? (
         <p className="text-gray-500">Cargando...</p>
       ) : filteredTickets.length === 0 ? (
         <p className="text-gray-500">No hay tickets en esta sección.</p>

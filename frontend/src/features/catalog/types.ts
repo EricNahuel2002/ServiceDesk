@@ -3,11 +3,3 @@ export interface CategoryDto {
   name: string
   isActive: boolean
 }
-
-export interface StatusDto {
-  id: string
-  name: string
-  sortOrder: number
-  isClosed: boolean
-  isActive: boolean
-}

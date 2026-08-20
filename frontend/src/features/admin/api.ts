@@ -8,6 +8,12 @@ import type {
 import type { CategoryDto } from '../catalog/types'
 import type { UserListItemDto } from './types'
 import type { AdminMetricsDto } from './types'
+import type {
+  SlaConfigurationDto,
+  UpdateSlaConfigurationRequest,
+  BusinessHoursDto,
+  UpdateBusinessHoursRequest,
+} from './types'
 
 export function getAllTickets(): Promise<TicketDto[]> {
   return apiClient.get<TicketDto[]>('/admin/tickets')
@@ -62,4 +68,20 @@ export function getMetrics(params: {
   if (params.period) searchParams.set('period', params.period)
   const query = searchParams.toString()
   return apiClient.get<AdminMetricsDto>(`/admin/metrics${query ? `?${query}` : ''}`)
+}
+
+export function getSlaConfigurations(): Promise<SlaConfigurationDto[]> {
+  return apiClient.get<SlaConfigurationDto[]>('/admin/sla/configurations')
+}
+
+export function updateSlaConfiguration(data: UpdateSlaConfigurationRequest): Promise<SlaConfigurationDto> {
+  return apiClient.put<SlaConfigurationDto>('/admin/sla/configurations', data)
+}
+
+export function getBusinessHours(): Promise<BusinessHoursDto> {
+  return apiClient.get<BusinessHoursDto>('/admin/sla/business-hours')
+}
+
+export function updateBusinessHours(data: UpdateBusinessHoursRequest): Promise<BusinessHoursDto> {
+  return apiClient.put<BusinessHoursDto>('/admin/sla/business-hours', data)
 }

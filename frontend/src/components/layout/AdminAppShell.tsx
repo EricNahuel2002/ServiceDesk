@@ -3,13 +3,14 @@ import type { ReactNode } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
 interface NavItem {
-  to: '/admin' | '/admin/categories' | '/admin/technicians' | '/admin/metrics'
+  to: '/admin' | '/admin/categories' | '/admin/sla' | '/admin/technicians' | '/admin/metrics'
   label: string
 }
 
 const navItems: NavItem[] = [
   { to: '/admin', label: 'Dashboard' },
   { to: '/admin/categories', label: 'Categorías' },
+  { to: '/admin/sla', label: 'SLA' },
   { to: '/admin/technicians', label: 'Usuarios' },
   { to: '/admin/metrics', label: 'Métricas' },
 ]
