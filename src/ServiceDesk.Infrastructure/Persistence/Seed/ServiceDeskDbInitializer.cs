@@ -20,6 +20,11 @@ public sealed class ServiceDeskDbInitializer
     private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly ILogger<ServiceDeskDbInitializer> _logger;
 
+    private static readonly JsonSerializerOptions BusinessHoursJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     public ServiceDeskDbInitializer(
         ServiceDeskDbContext context,
         UserManager<ApplicationUser> userManager,
@@ -106,7 +111,7 @@ public sealed class ServiceDeskDbInitializer
             ["Friday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
             ["Saturday"] = new() { Enabled = false },
             ["Sunday"] = new() { Enabled = false }
-        });
+        }, BusinessHoursJsonOptions);
 
         _context.CompanyBusinessHours.Add(new CompanyBusinessHours
         {
@@ -168,7 +173,7 @@ public sealed class ServiceDeskDbInitializer
             ["Friday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
             ["Saturday"] = new() { Enabled = false },
             ["Sunday"] = new() { Enabled = false }
-        });
+        }, BusinessHoursJsonOptions);
 
         _context.CompanyBusinessHours.Add(new CompanyBusinessHours
         {

@@ -78,20 +78,31 @@ function AdminSlaPage() {
     if (!bhQuery.data) {
       return { timezone: '', useBh: true, days: {} as Record<string, DaySchedule>, maxAssignmentToStartMinutes: 120 }
     }
-    try {
-      return {
-        timezone: bhQuery.data.timeZoneId,
-        useBh: bhQuery.data.useBusinessHours,
-        days: JSON.parse(bhQuery.data.businessHoursJson) as Record<string, DaySchedule>,
-        maxAssignmentToStartMinutes: bhQuery.data.maxAssignmentToStartMinutes,
+    const days = (() => {
+      try {
+        const parsed = JSON.parse(bhQuery.data.businessHoursJson) as Record<
+          string,
+          Partial<DaySchedule> & { Enabled?: boolean; Start?: string | null; End?: string | null }
+        >
+        return Object.fromEntries(
+          Object.entries(parsed).map(([day, value]) => [
+            day,
+            {
+              enabled: value.enabled ?? value.Enabled ?? false,
+              start: value.start ?? value.Start ?? null,
+              end: value.end ?? value.End ?? null,
+            },
+          ]),
+        )
+      } catch {
+        return {} as Record<string, DaySchedule>
       }
-    } catch {
-      return {
-        timezone: bhQuery.data.timeZoneId,
-        useBh: bhQuery.data.useBusinessHours,
-        days: {} as Record<string, DaySchedule>,
-        maxAssignmentToStartMinutes: 120,
-      }
+    })()
+    return {
+      timezone: bhQuery.data.timeZoneId,
+      useBh: bhQuery.data.useBusinessHours,
+      days,
+      maxAssignmentToStartMinutes: bhQuery.data.maxAssignmentToStartMinutes,
     }
   }, [bhQuery.data])
 

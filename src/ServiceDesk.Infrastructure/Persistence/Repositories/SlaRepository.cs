@@ -28,7 +28,6 @@ public sealed class SlaRepository : ISlaRepository
         TicketPriority priority,
         CancellationToken cancellationToken = default) =>
         await _context.SlaConfigurations
-            .AsNoTracking()
             .SingleOrDefaultAsync(
                 s => s.CompanyId == companyId && s.Priority == priority,
                 cancellationToken);
@@ -37,7 +36,6 @@ public sealed class SlaRepository : ISlaRepository
         Guid companyId,
         CancellationToken cancellationToken = default) =>
         await _context.CompanyBusinessHours
-            .AsNoTracking()
             .SingleOrDefaultAsync(b => b.CompanyId == companyId, cancellationToken);
 
     public async Task AddRangeAsync(
