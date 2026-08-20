@@ -74,6 +74,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
+          version: 11.0.9
           package_json_path: frontend/package.json
 
       - name: Setup Node
