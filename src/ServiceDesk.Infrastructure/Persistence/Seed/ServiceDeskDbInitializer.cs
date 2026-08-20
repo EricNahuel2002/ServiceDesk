@@ -113,7 +113,8 @@ public sealed class ServiceDeskDbInitializer
             CompanyId = company.Id,
             TimeZoneId = "Argentina Standard Time",
             BusinessHoursJson = businessHoursJson,
-            UseBusinessHours = true
+            UseBusinessHours = true,
+            MaxAssignmentToStartMinutes = 120
         });
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -174,7 +175,8 @@ public sealed class ServiceDeskDbInitializer
             CompanyId = companyId,
             TimeZoneId = "Argentina Standard Time",
             BusinessHoursJson = businessHoursJson,
-            UseBusinessHours = true
+            UseBusinessHours = true,
+            MaxAssignmentToStartMinutes = 120
         });
 
         await _context.SaveChangesAsync(cancellationToken);

@@ -13,5 +13,7 @@ public class CompanyBusinessHours : BaseEntity
 
     public bool UseBusinessHours { get; set; } = true;
 
+    public int MaxAssignmentToStartMinutes { get; set; }
+
     public Company? Company { get; set; }
 }

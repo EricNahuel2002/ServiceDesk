@@ -30,6 +30,17 @@ function TechnicianTicketDetailPage() {
   const [resolutionNote, setResolutionNote] = useState('')
   const [error, setError] = useState('')
 
+  function handleStartWork() {
+    startWork.mutate(ticketId, {
+      onError: (err) => {
+        setError(err instanceof Error ? err.message : 'Error al iniciar el trabajo.')
+      },
+      onSuccess: () => {
+        setError('')
+      },
+    })
+  }
+
   function handleResolve() {
     resolveTicket.mutate(
       { id: ticketId, resolutionNote: resolutionNote.trim() },
@@ -166,12 +177,15 @@ function TechnicianTicketDetailPage() {
           <Card>
             <h3 className="mb-3 text-sm font-semibold text-gray-900">Acciones</h3>
             {!t.startedWorkAtUtc && !showResolveForm ? (
-              <Button
-                onClick={() => startWork.mutate(ticketId)}
-                disabled={startWork.isPending}
-              >
-                {startWork.isPending ? 'Iniciando...' : 'Iniciar trabajo'}
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={handleStartWork}
+                  disabled={startWork.isPending}
+                >
+                  {startWork.isPending ? 'Iniciando...' : 'Iniciar trabajo'}
+                </Button>
+                {error && <p className="text-sm text-red-600">{error}</p>}
+              </div>
             ) : !showResolveForm ? (
               <Button onClick={() => { setShowResolveForm(true); setError('') }}>
                 Resolver ticket

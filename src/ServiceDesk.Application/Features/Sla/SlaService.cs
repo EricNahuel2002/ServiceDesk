@@ -92,7 +92,8 @@ public sealed class SlaService : ISlaService
             {
                 BusinessHoursJson = string.Empty,
                 TimeZoneId = "UTC",
-                UseBusinessHours = true
+                UseBusinessHours = true,
+                MaxAssignmentToStartMinutes = 0
             };
         }
 
@@ -100,7 +101,8 @@ public sealed class SlaService : ISlaService
         {
             BusinessHoursJson = businessHours.BusinessHoursJson,
             TimeZoneId = businessHours.TimeZoneId,
-            UseBusinessHours = businessHours.UseBusinessHours
+            UseBusinessHours = businessHours.UseBusinessHours,
+            MaxAssignmentToStartMinutes = businessHours.MaxAssignmentToStartMinutes
         };
     }
 
@@ -121,7 +123,8 @@ public sealed class SlaService : ISlaService
                 CompanyId = _currentUser.CompanyId,
                 BusinessHoursJson = request.BusinessHoursJson,
                 TimeZoneId = request.TimeZoneId,
-                UseBusinessHours = request.UseBusinessHours
+                UseBusinessHours = request.UseBusinessHours,
+                MaxAssignmentToStartMinutes = request.MaxAssignmentToStartMinutes
             };
 
             await _slaRepository.AddAsync(newBusinessHours, cancellationToken);
@@ -131,6 +134,7 @@ public sealed class SlaService : ISlaService
             existing.BusinessHoursJson = request.BusinessHoursJson;
             existing.TimeZoneId = request.TimeZoneId;
             existing.UseBusinessHours = request.UseBusinessHours;
+            existing.MaxAssignmentToStartMinutes = request.MaxAssignmentToStartMinutes;
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -139,7 +143,8 @@ public sealed class SlaService : ISlaService
         {
             BusinessHoursJson = request.BusinessHoursJson,
             TimeZoneId = request.TimeZoneId,
-            UseBusinessHours = request.UseBusinessHours
+            UseBusinessHours = request.UseBusinessHours,
+            MaxAssignmentToStartMinutes = request.MaxAssignmentToStartMinutes
         };
     }
 }

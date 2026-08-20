@@ -181,7 +181,7 @@ function AdminTicketDetailPage() {
             </div>
           </Card>
 
-          {t.assignedAtUtc && (
+          {(t.assignedAtUtc || t.startedWorkAtUtc) && (
             <Card>
               <h2 className="mb-4 text-lg font-semibold text-gray-900">Estado SLA</h2>
               <div className="flex flex-col gap-4">
@@ -210,6 +210,7 @@ function AdminTicketDetailPage() {
                   <SlaProgressBar
                     percentageElapsed={t.resolvedAtUtc ? 100 : t.slaPercentageElapsed}
                     isOverdue={t.isOverdue}
+                    isResolved={!!t.resolvedAtUtc}
                   />
                 </div>
                 <SlaDelayBar

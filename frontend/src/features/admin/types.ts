@@ -61,3 +61,33 @@ export interface TechnicianMetricDto {
   averageResolutionHours: number
   averageStartHours: number
 }
+
+export interface SlaConfigurationDto {
+  priority: number
+  responseTimeHours: number
+}
+
+export interface UpdateSlaConfigurationRequest {
+  priority: number
+  responseTimeHours: number
+}
+
+export interface BusinessHoursDto {
+  businessHoursJson: string
+  timeZoneId: string
+  useBusinessHours: boolean
+  maxAssignmentToStartMinutes: number
+}
+
+export interface UpdateBusinessHoursRequest {
+  businessHoursJson: string
+  timeZoneId: string
+  useBusinessHours: boolean
+  maxAssignmentToStartMinutes: number
+}
+
+export interface DaySchedule {
+  enabled: boolean
+  start: string | null
+  end: string | null
+}

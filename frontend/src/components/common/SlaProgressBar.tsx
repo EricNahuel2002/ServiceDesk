@@ -1,16 +1,21 @@
 interface SlaProgressBarProps {
   percentageElapsed: number
   isOverdue: boolean
+  isResolved?: boolean
 }
 
-export function SlaProgressBar({ percentageElapsed, isOverdue }: SlaProgressBarProps) {
+export function SlaProgressBar({ percentageElapsed, isOverdue, isResolved }: SlaProgressBarProps) {
   const displayPercentage = Math.min(percentageElapsed, 100)
 
   let barColor: string
   let textColor: string
   let label: string
 
-  if (isOverdue) {
+  if (isResolved) {
+    barColor = 'bg-emerald-500'
+    textColor = 'text-emerald-600'
+    label = 'Resuelto'
+  } else if (isOverdue) {
     barColor = 'bg-red-500'
     textColor = 'text-red-600'
     label = `Retrasado (${Math.round(percentageElapsed)}%)`

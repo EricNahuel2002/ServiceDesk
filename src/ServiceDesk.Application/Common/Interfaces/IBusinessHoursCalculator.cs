@@ -13,4 +13,11 @@ public interface IBusinessHoursCalculator
         DateTime toUtc,
         CompanyBusinessHours businessHours,
         int totalHoursLimit);
+
+    bool IsWithinBusinessHours(DateTime utcNow, CompanyBusinessHours businessHours);
+
+    int CalculateDelayMinutes(
+        DateTime assignedAtUtc,
+        DateTime? startedWorkAtUtc,
+        int maxAssignmentToStartMinutes);
 }

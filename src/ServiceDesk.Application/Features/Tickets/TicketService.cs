@@ -4,10 +4,8 @@ using ServiceDesk.Application.Common.Exceptions;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.Common.Validation;
 using ServiceDesk.Application.DTOs.Notifications;
-using ServiceDesk.Application.DTOs.Catalog;
 using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Application.Features.Tickets.Validators;
-using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Common;
 using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
@@ -69,6 +67,8 @@ public sealed class TicketService : ITicketService
     public async Task<TicketDto> CreateAsync(CreateTicketRequest request, CancellationToken cancellationToken)
     {
         await ValidationHelper.ValidateAsync(_validator, request, cancellationToken);
+
+        await EnsureWithinBusinessHoursAsync(cancellationToken);
 
         Guid companyId = _currentUser.CompanyId;
         Guid userId = _currentUser.UserId;
@@ -186,6 +186,8 @@ public sealed class TicketService : ITicketService
             throw new NotFoundException($"El ticket con id {id} no existe o no está asignado a ti.");
         }
 
+        await EnsureWithinBusinessHoursAsync(cancellationToken);
+
         ApplicationUser? technician = await _users.GetByIdAsync(_currentUser.UserId, cancellationToken);
 
         if (technician is null || !technician.IsActive)
@@ -206,7 +208,7 @@ public sealed class TicketService : ITicketService
             });
         }
 
-        Guid? enProgresoStatusId = await FindStatusByNameAsync(ticket.CompanyId, "En Progreso", cancellationToken);
+        Guid? enProgresoStatusId = await _catalog.FindStatusByNameAsync(ticket.CompanyId, "En Progreso", cancellationToken);
 
         if (enProgresoStatusId is null)
         {
@@ -244,6 +246,8 @@ public sealed class TicketService : ITicketService
             throw new NotFoundException($"El ticket con id {id} no existe.");
         }
 
+        await EnsureWithinBusinessHoursAsync(cancellationToken);
+
         ApplicationUser? technician = await _users.GetByIdAsync(_currentUser.UserId, cancellationToken);
 
         if (technician is null)
@@ -253,16 +257,6 @@ public sealed class TicketService : ITicketService
 
         TicketFinalizationPolicy.EnsureCanBeFinalizedBy(ticket, technician);
 
-        Status? currentStatus = await _catalog.GetStatusByIdAsync(ticket.StatusId, cancellationToken);
-
-        if (currentStatus is not null && currentStatus.IsClosed)
-        {
-            throw new ValidationException(new Dictionary<string, string[]>
-            {
-                ["Ticket"] = ["El ticket ya fue finalizado."]
-            });
-        }
-
         Guid? closedStatusId = await _catalog.FindFirstClosedStatusIdAsync(_currentUser.CompanyId, cancellationToken);
 
         if (closedStatusId is null)
@@ -270,6 +264,14 @@ public sealed class TicketService : ITicketService
             throw new ValidationException(new Dictionary<string, string[]>
             {
                 ["StatusId"] = ["No se encontró un estado de cierre para tu empresa."]
+            });
+        }
+
+        if (ticket.StatusId == closedStatusId.Value)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Ticket"] = ["El ticket ya fue finalizado."]
             });
         }
 
@@ -316,10 +318,20 @@ public sealed class TicketService : ITicketService
 
         bool wasReassigned = request.AssignedToId.HasValue && ticket.AssignedToId != request.AssignedToId.Value;
 
+        if (wasReassigned)
+        {
+            await EnsureWithinBusinessHoursAsync(cancellationToken);
+        }
+
         bool priorityChanged = ticket.Priority != request.Priority;
 
         ticket.AssignedToId = request.AssignedToId ?? ticket.AssignedToId;
         ticket.Priority = request.Priority;
+
+        if (wasReassigned)
+        {
+            ticket.AssignedAtUtc = DateTime.UtcNow;
+        }
 
         if (priorityChanged && request.Priority.HasValue)
         {
@@ -358,9 +370,11 @@ public sealed class TicketService : ITicketService
 
         await EnsureTechnicianValidAsync(request.AssignedToId, cancellationToken);
 
+        await EnsureWithinBusinessHoursAsync(cancellationToken);
+
         bool wasReassigned = ticket.AssignedToId != request.AssignedToId;
 
-        Guid? enEsperaStatusId = await FindStatusByNameAsync(ticket.CompanyId, "En Espera", cancellationToken);
+        Guid? enEsperaStatusId = await _catalog.FindStatusByNameAsync(ticket.CompanyId, "En Espera", cancellationToken);
 
         if (enEsperaStatusId is null)
         {
@@ -440,6 +454,24 @@ public sealed class TicketService : ITicketService
         }
 
         return technician;
+    }
+
+    private async Task EnsureWithinBusinessHoursAsync(CancellationToken cancellationToken)
+    {
+        CompanyBusinessHours? businessHours = await _slaRepository.GetBusinessHoursAsync(
+            _currentUser.CompanyId,
+            cancellationToken);
+
+        if (businessHours is null || !businessHours.UseBusinessHours)
+        {
+            return;
+        }
+
+        if (!_businessHoursCalculator.IsWithinBusinessHours(DateTime.UtcNow, businessHours))
+        {
+            throw new DomainRuleViolationException(
+                "Esta acción no se puede realizar fuera del horario laboral de la empresa.");
+        }
     }
 
     private async Task<DateTime> CalculateResponseDeadlineAsync(
@@ -539,13 +571,6 @@ public sealed class TicketService : ITicketService
         return statusId.Value;
     }
 
-    private async Task<Guid?> FindStatusByNameAsync(Guid companyId, string name, CancellationToken cancellationToken)
-    {
-        IReadOnlyList<StatusDto> statuses = await _catalog.GetAllStatusesAsync(companyId, cancellationToken);
-        StatusDto? status = statuses.FirstOrDefault(s => s.Name == name);
-        return status?.Id;
-    }
-
     private static string BuildBlobName(Guid companyId, Guid ticketId, Guid attachmentId) =>
         $"{companyId:N}/{ticketId:N}/{attachmentId:N}";
 
@@ -632,8 +657,11 @@ public sealed class TicketService : ITicketService
 
         if (ticket.AssignedAtUtc is not null)
         {
-            DateTime delayEnd = ticket.StartedWorkAtUtc ?? DateTime.UtcNow;
-            delayMinutes = (int)(delayEnd - ticket.AssignedAtUtc.Value).TotalMinutes;
+            int maxAssignmentToStartMinutes = businessHours?.MaxAssignmentToStartMinutes ?? 0;
+            delayMinutes = BusinessHoursCalculator.CalculateDelayMinutes(
+                ticket.AssignedAtUtc.Value,
+                ticket.StartedWorkAtUtc,
+                maxAssignmentToStartMinutes);
             effectiveSlaLimitHours = Math.Max(0, slaLimit - delayMinutes / 60m);
         }
 

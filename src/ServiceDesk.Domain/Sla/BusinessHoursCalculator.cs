@@ -12,6 +12,54 @@ public static class BusinessHoursCalculator
     public static bool IsBusinessHoursEnabled(CompanyBusinessHours? businessHours) =>
         businessHours is not null && businessHours.UseBusinessHours;
 
+    public static bool IsWithinBusinessHours(
+        DateTime utcNow,
+        CompanyBusinessHours businessHours)
+    {
+        TimeZoneInfo tz = GetTimeZone(businessHours.TimeZoneId);
+        Dictionary<string, DaySchedule> schedule = ParseSchedule(businessHours.BusinessHoursJson);
+
+        DateTime localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, tz);
+        string dayName = localNow.DayOfWeek.ToString();
+        string dayKey = GetDayKey(dayName);
+
+        if (!schedule.TryGetValue(dayKey, out DaySchedule? day) ||
+            !day.Enabled ||
+            day.Start is null ||
+            day.End is null)
+        {
+            return false;
+        }
+
+        TimeOnly dayStart = TimeOnly.Parse(day.Start);
+        TimeOnly dayEnd = TimeOnly.Parse(day.End);
+        TimeOnly currentTime = TimeOnly.FromDateTime(localNow);
+
+        return currentTime >= dayStart && currentTime < dayEnd;
+    }
+
+    public static int CalculateDelayMinutes(
+        DateTime assignedAtUtc,
+        DateTime? startedWorkAtUtc,
+        int maxAssignmentToStartMinutes)
+    {
+        DateTime endTime = startedWorkAtUtc ?? DateTime.UtcNow;
+
+        if (endTime <= assignedAtUtc)
+        {
+            return 0;
+        }
+
+        DateTime graceDeadline = assignedAtUtc.AddMinutes(maxAssignmentToStartMinutes);
+
+        if (endTime <= graceDeadline)
+        {
+            return 0;
+        }
+
+        return (int)(endTime - graceDeadline).TotalMinutes;
+    }
+
     public static TimeSpan CalculateElapsed(
         DateTime fromUtc,
         DateTime toUtc,

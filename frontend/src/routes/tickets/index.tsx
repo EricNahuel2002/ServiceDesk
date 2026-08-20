@@ -236,7 +236,11 @@ function CreateTicketPage() {
             </ul>
           ) : null}
 
-          {apiErrorPayload?.title && !apiErrorPayload.errors ? (
+          {apiErrorPayload?.detail && !apiErrorPayload.errors ? (
+            <p className="text-sm text-red-600">{apiErrorPayload.detail}</p>
+          ) : null}
+
+          {apiErrorPayload?.title && !apiErrorPayload.errors && !apiErrorPayload.detail ? (
             <p className="text-sm text-red-600">{apiErrorPayload.title}</p>
           ) : null}
 
