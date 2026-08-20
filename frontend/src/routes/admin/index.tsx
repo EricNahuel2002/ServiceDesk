@@ -15,11 +15,11 @@ export const Route = createFileRoute('/admin/')({
   component: AdminDashboardPage,
 })
 
-type Tab = 'todos' | 'abiertos' | 'progreso' | 'finalizados' | 'cancelados'
+type Tab = 'todos' | 'sinAsignar' | 'progreso' | 'finalizados' | 'cancelados'
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'todos', label: 'Todos' },
-  { id: 'abiertos', label: 'Abiertos' },
+  { id: 'sinAsignar', label: 'Sin asignar' },
   { id: 'progreso', label: 'En progreso' },
   { id: 'finalizados', label: 'Finalizados' },
   { id: 'cancelados', label: 'Cancelados' },
@@ -32,16 +32,7 @@ function AdminDashboardPage() {
 
   const allTickets = tickets.data ?? []
 
-  const openCount = allTickets.filter((t) => {
-    const lower = t.statusName.toLowerCase()
-    return (
-      !isClosed(t) &&
-      !lower.includes('progreso') &&
-      !lower.includes('asignad') &&
-      !lower.includes('progress') &&
-      !lower.includes('assigned')
-    )
-  }).length
+  const unassignedCount = allTickets.filter((t) => !t.assignedToId).length
 
   const inProgressCount = allTickets.filter((t) => {
     const lower = t.statusName.toLowerCase()
@@ -74,16 +65,7 @@ function AdminDashboardPage() {
         (lower.includes('cancelado') || lower.includes('cancelled') || lower.includes('canceled'))
       )
     }
-    if (tab === 'abiertos') {
-      const lower = ticket.statusName.toLowerCase()
-      return (
-        !isClosed(ticket) &&
-        !lower.includes('progreso') &&
-        !lower.includes('asignad') &&
-        !lower.includes('progress') &&
-        !lower.includes('assigned')
-      )
-    }
+    if (tab === 'sinAsignar') return !ticket.assignedToId
     if (tab === 'progreso') {
       const lower = ticket.statusName.toLowerCase()
       return (
@@ -109,8 +91,8 @@ function AdminDashboardPage() {
           <p className="mt-1 text-2xl font-semibold text-gray-900">{allTickets.length}</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-500">Abiertos</p>
-          <p className="mt-1 text-2xl font-semibold text-[#0F52BA]">{openCount}</p>
+          <p className="text-sm text-gray-500">Sin asignar</p>
+          <p className="mt-1 text-2xl font-semibold text-[#0F52BA]">{unassignedCount}</p>
         </Card>
         <Card>
           <p className="text-sm text-gray-500">En progreso</p>

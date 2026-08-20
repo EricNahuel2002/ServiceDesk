@@ -32,12 +32,17 @@ function RootComponent() {
 function ChatWidgetWrapper() {
   const { user, isAuthenticated } = useAuth()
 
+  const isChatEnabled =
+    isAuthenticated && user && (user.role === 'Tecnico' || user.role === 'Cliente')
+
   const ticketsQuery = useQuery({
     queryKey: ['chat-widget-tickets'],
     queryFn: user?.role === 'Tecnico' ? getAssignedTickets : getMyTickets,
-    enabled: isAuthenticated,
+    enabled: isChatEnabled,
     staleTime: 30_000,
   })
+
+  if (!isChatEnabled) return null
 
   const tickets = (ticketsQuery.data ?? [])
     .filter((t) => t.assignedToId)
