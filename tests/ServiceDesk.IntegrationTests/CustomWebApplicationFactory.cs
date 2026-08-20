@@ -16,14 +16,32 @@ using ServiceDesk.Domain.Common;
 using ServiceDesk.Domain.Companies;
 using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
+using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
 using ServiceDesk.Infrastructure.Persistence;
 using ServiceDesk.IntegrationTests.Fakes;
 
 namespace ServiceDesk.IntegrationTests;
 
-public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
+public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public async Task InitializeAsync()
+    {
+        await DisableBusinessHoursForSeedCompanyAsync();
+    }
+
+    Task IAsyncLifetime.DisposeAsync() => base.DisposeAsync().AsTask();
+
+    private async Task DisableBusinessHoursForSeedCompanyAsync()
+    {
+        Guid companyId = await GetCompanyIdAsync(SeedCompanyName);
+        using IServiceScope scope = Services.CreateScope();
+        ServiceDeskDbContext context = scope.ServiceProvider.GetRequiredService<ServiceDeskDbContext>();
+        CompanyBusinessHours businessHours = await context.CompanyBusinessHours
+            .SingleAsync(b => b.CompanyId == companyId);
+        businessHours.UseBusinessHours = false;
+        await context.SaveChangesAsync();
+    }
     private const string DefaultTestConnectionString =
         "Server=.\\SQLEXPRESS;Database=ServiceDesk_Test;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true";
 
