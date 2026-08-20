@@ -139,7 +139,48 @@ public sealed class TicketRepository : ITicketRepository
                 && attachment.Ticket!.CompanyId == companyId)
             .SingleOrDefaultAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Ticket>> GetSlaTrackedTicketsAsync(CancellationToken cancellationToken = default) =>
+        await _context.Tickets
+            .Where(ticket => ticket.ResolvedAtUtc == null
+                && ticket.AssignedToId != null
+                && ticket.Priority != null
+                && ticket.SlaRecords.Any(record => record.IsCurrent && record.CanceledAtUtc == null))
+            .Include(ticket => ticket.SlaRecords)
+            .ToListAsync(cancellationToken);
+
+    public async Task<TicketSlaRecord?> GetCurrentSlaRecordAsync(
+        Guid ticketId,
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketSlaRecords
+            .Where(record => record.TicketId == ticketId && record.IsCurrent && record.CanceledAtUtc == null)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsByTicketIdsAsync(
+        IReadOnlyCollection<Guid> ticketIds,
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketSlaRecords
+            .Where(record => ticketIds.Contains(record.TicketId))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsByIdsAsync(
+        IReadOnlyCollection<Guid> recordIds,
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketSlaRecords
+            .Where(record => recordIds.Contains(record.Id))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TicketSlaRecord>> GetCanceledSlaRecordsPendingNotificationAsync(
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketSlaRecords
+            .Where(record => record.CanceledAtUtc != null
+                && record.CanceledNotifiedAtUtc == null
+                && record.TechnicianId != null)
+            .Include(record => record.Ticket)
+            .ToListAsync(cancellationToken);
+
     public void Add(Ticket ticket) => _context.Tickets.Add(ticket);
+
+    public void AddSlaRecord(TicketSlaRecord record) => _context.TicketSlaRecords.Add(record);
 
     public void AddComment(TicketComment comment) => _context.TicketComments.Add(comment);
 }

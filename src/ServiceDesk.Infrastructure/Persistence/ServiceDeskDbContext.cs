@@ -31,6 +31,8 @@ public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     public DbSet<TicketAttachment> TicketAttachments => Set<TicketAttachment>();
 
+    public DbSet<TicketSlaRecord> TicketSlaRecords => Set<TicketSlaRecord>();
+
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Status> Statuses => Set<Status>();
@@ -118,6 +120,23 @@ internal sealed class DateTimeUtcInterceptor : IMaterializationInterceptor
                 ticket.StartedWorkAtUtc = EnsureUtc(ticket.StartedWorkAtUtc.Value);
             if (ticket.ResolvedAtUtc.HasValue)
                 ticket.ResolvedAtUtc = EnsureUtc(ticket.ResolvedAtUtc.Value);
+        }
+
+        if (entity is TicketSlaRecord slaRecord)
+        {
+            slaRecord.ResponseDeadlineAtUtc = EnsureUtc(slaRecord.ResponseDeadlineAtUtc);
+            if (slaRecord.BreachedAtUtc.HasValue)
+                slaRecord.BreachedAtUtc = EnsureUtc(slaRecord.BreachedAtUtc.Value);
+            if (slaRecord.GraceDeadlineUtc.HasValue)
+                slaRecord.GraceDeadlineUtc = EnsureUtc(slaRecord.GraceDeadlineUtc.Value);
+            if (slaRecord.CanceledAtUtc.HasValue)
+                slaRecord.CanceledAtUtc = EnsureUtc(slaRecord.CanceledAtUtc.Value);
+            if (slaRecord.ExpiringNotifiedAtUtc.HasValue)
+                slaRecord.ExpiringNotifiedAtUtc = EnsureUtc(slaRecord.ExpiringNotifiedAtUtc.Value);
+            if (slaRecord.BreachedNotifiedAtUtc.HasValue)
+                slaRecord.BreachedNotifiedAtUtc = EnsureUtc(slaRecord.BreachedNotifiedAtUtc.Value);
+            if (slaRecord.CanceledNotifiedAtUtc.HasValue)
+                slaRecord.CanceledNotifiedAtUtc = EnsureUtc(slaRecord.CanceledNotifiedAtUtc.Value);
         }
 
         if (entity is RefreshToken refreshToken)

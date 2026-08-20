@@ -45,4 +45,6 @@ public class Ticket : BaseEntity
     public ICollection<TicketComment> Comments { get; set; } = [];
 
     public ICollection<TicketAttachment> Attachments { get; set; } = [];
+
+    public ICollection<TicketSlaRecord> SlaRecords { get; set; } = [];
 }

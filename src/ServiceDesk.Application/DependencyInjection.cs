@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<ICatalogVerificationService, CatalogVerificationService>();
         services.AddScoped<ITicketService, TicketService>();
         services.AddScoped<ISlaService, SlaService>();
+        services.AddScoped<ISlaMonitoringService, SlaMonitoringService>();
         services.AddScoped<IMetricsService, MetricsService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IChatService, ChatService>();

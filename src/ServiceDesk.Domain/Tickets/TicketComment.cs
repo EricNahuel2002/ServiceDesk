@@ -7,7 +7,7 @@ public class TicketComment : BaseEntity
 {
     public Guid TicketId { get; set; }
 
-    public Guid AuthorId { get; set; }
+    public Guid? AuthorId { get; set; }
 
     public string Body { get; set; } = string.Empty;
 

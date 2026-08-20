@@ -342,6 +342,20 @@ public sealed class TicketService : ITicketService
                 cancellationToken);
         }
 
+        if (ticket.Priority is not null)
+        {
+            int slaLimitHours = await GetSlaLimitHoursAsync(
+                _currentUser.CompanyId,
+                ticket.Priority.Value,
+                cancellationToken);
+
+            await RefreshCurrentSlaRecordAsync(ticket, slaLimitHours, ticket.AssignedToId, cancellationToken);
+        }
+        else
+        {
+            await DeactivateCurrentSlaRecordAsync(ticket, cancellationToken);
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (wasReassigned)
@@ -387,6 +401,16 @@ public sealed class TicketService : ITicketService
         ticket.AssignedToId = request.AssignedToId;
         ticket.StatusId = enEsperaStatusId.Value;
         ticket.AssignedAtUtc = DateTime.UtcNow;
+
+        if (ticket.Priority is not null)
+        {
+            int slaLimitHours = await GetSlaLimitHoursAsync(
+                ticket.CompanyId,
+                ticket.Priority.Value,
+                cancellationToken);
+
+            await RefreshCurrentSlaRecordAsync(ticket, slaLimitHours, request.AssignedToId, cancellationToken);
+        }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -508,6 +532,61 @@ public sealed class TicketService : ITicketService
             createdAtUtc,
             slaConfig.ResponseTimeHours,
             businessHours);
+    }
+
+    private async Task<int> GetSlaLimitHoursAsync(
+        Guid companyId,
+        TicketPriority priority,
+        CancellationToken cancellationToken)
+    {
+        SlaConfiguration? configuration = await _slaRepository.FindByCompanyAndPriorityAsync(
+            companyId,
+            priority,
+            cancellationToken);
+
+        return configuration?.ResponseTimeHours ?? 4;
+    }
+
+    private async Task RefreshCurrentSlaRecordAsync(
+        Ticket ticket,
+        int slaLimitHours,
+        Guid? technicianId,
+        CancellationToken cancellationToken)
+    {
+        TicketSlaRecord? current = await _tickets.GetCurrentSlaRecordAsync(ticket.Id, cancellationToken);
+
+        if (current is not null && current.TechnicianId == technicianId)
+        {
+            current.ResponseDeadlineAtUtc = ticket.ResponseDeadlineAtUtc;
+            current.SlaLimitHours = slaLimitHours;
+            return;
+        }
+
+        if (current is not null)
+        {
+            current.IsCurrent = false;
+        }
+
+        _tickets.AddSlaRecord(new TicketSlaRecord
+        {
+            Id = Guid.NewGuid(),
+            TicketId = ticket.Id,
+            TechnicianId = technicianId,
+            Priority = ticket.Priority!.Value,
+            SlaLimitHours = slaLimitHours,
+            ResponseDeadlineAtUtc = ticket.ResponseDeadlineAtUtc,
+            IsCurrent = true
+        });
+    }
+
+    private async Task DeactivateCurrentSlaRecordAsync(Ticket ticket, CancellationToken cancellationToken)
+    {
+        TicketSlaRecord? current = await _tickets.GetCurrentSlaRecordAsync(ticket.Id, cancellationToken);
+
+        if (current is not null)
+        {
+            current.IsCurrent = false;
+        }
     }
 
     private async Task EnqueueAssignedNotificationAsync(

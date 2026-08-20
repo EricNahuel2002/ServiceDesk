@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.Configuration;
+using ServiceDesk.Application.Features.Sla;
 using ServiceDesk.Domain.Identity;
 using ServiceDesk.Infrastructure.Persistence;
 using ServiceDesk.Infrastructure.Persistence.Repositories;
@@ -118,6 +119,11 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<ServiceDeskDbContext>());
         services.AddScoped<ITicketRepository, TicketRepository>();
+
+        services.AddScoped<ICatalogRepository, CatalogRepository>();
+        services.AddScoped<ISlaRepository, SlaRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ISlaMonitoringService, SlaMonitoringService>();
 
         _ = ReadCommunicationServicesSettings(configuration);
         services.Configure<CommunicationServicesSettings>(configuration.GetSection(CommunicationServicesSettingsSection));
