@@ -11,9 +11,13 @@ public sealed class TicketSlaRecordConfiguration : IEntityTypeConfiguration<Tick
         builder.Property(r => r.Priority)
             .HasConversion<int>();
 
+        builder.Property(r => r.CanceledReason)
+            .HasConversion<int>();
+
         builder.HasIndex(r => r.TicketId);
         builder.HasIndex(r => r.TechnicianId);
         builder.HasIndex(r => r.IsCurrent);
+        builder.HasIndex(r => r.CanceledReason);
 
         builder.HasOne(r => r.Ticket)
             .WithMany(t => t.SlaRecords)

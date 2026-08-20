@@ -34,6 +34,8 @@ public interface ITicketRepository
 
     Task<IReadOnlyList<Ticket>> GetSlaTrackedTicketsAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Ticket>> GetAssignedUnstartedTicketsAsync(CancellationToken cancellationToken = default);
+
     Task<TicketSlaRecord?> GetCurrentSlaRecordAsync(Guid ticketId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsByTicketIdsAsync(
@@ -45,6 +47,9 @@ public interface ITicketRepository
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TicketSlaRecord>> GetCanceledSlaRecordsPendingNotificationAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsPendingAdminReassignmentNotificationAsync(
         CancellationToken cancellationToken = default);
 
     void Add(Ticket ticket);

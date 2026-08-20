@@ -23,6 +23,9 @@ internal sealed class FakeTicketRepository : ITicketRepository
     public Task<IReadOnlyList<Ticket>> GetSlaTrackedTicketsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Ticket>>(SlaTickets);
 
+    public Task<IReadOnlyList<Ticket>> GetAssignedUnstartedTicketsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Ticket>>(SlaTickets);
+
     public Task<TicketSlaRecord?> GetCurrentSlaRecordAsync(
         Guid ticketId,
         CancellationToken cancellationToken = default) =>
@@ -47,6 +50,14 @@ internal sealed class FakeTicketRepository : ITicketRepository
             .Where(record => record.CanceledAtUtc != null
                 && record.CanceledNotifiedAtUtc == null
                 && record.TechnicianId != null)
+            .ToList());
+
+    public Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsPendingAdminReassignmentNotificationAsync(
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<TicketSlaRecord>>(SlaRecords
+            .Where(record => record.CanceledAtUtc != null
+                && record.CanceledReason == SlaRecordCancelReason.AssignmentStartGraceExceeded
+                && record.AdminReassignmentNotifiedAtUtc == null)
             .ToList());
 
     public void Add(Ticket ticket) => throw new NotSupportedException();

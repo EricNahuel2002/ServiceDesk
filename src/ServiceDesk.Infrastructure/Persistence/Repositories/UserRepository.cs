@@ -47,6 +47,25 @@ public sealed class UserRepository : IUserRepository
         return technicians;
     }
 
+    public async Task<IReadOnlyList<ApplicationUser>> GetActiveAdministratorsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        List<ApplicationUser> administrators = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.IsActive
+                && user.CompanyId == companyId
+                && _context.UserRoles.Any(userRole => userRole.UserId == user.Id && userRole.RoleId == _context.Roles
+                    .Where(role => role.Name == Roles.Administrador)
+                    .Select(role => role.Id)
+                    .FirstOrDefault()))
+            .OrderBy(user => user.FirstName)
+            .ThenBy(user => user.LastName)
+            .ToListAsync(cancellationToken);
+
+        return administrators;
+    }
+
     public async Task<IReadOnlyList<UserListItemDto>> GetAllByCompanyIdAsync(
         Guid companyId,
         CancellationToken cancellationToken = default)

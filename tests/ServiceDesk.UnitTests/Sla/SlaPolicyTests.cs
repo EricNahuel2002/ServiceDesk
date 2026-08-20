@@ -154,4 +154,59 @@ public sealed class SlaPolicyTests
         Assert.Equal(now, record.CanceledAtUtc);
         Assert.False(record.IsCurrent);
     }
+
+    [Fact]
+    public void IsAssignmentStartGraceExceeded_ReturnsTrue_WhenGracePeriodPassed()
+    {
+        Ticket ticket = CreateTicket(CreatedAt.AddHours(4));
+        ticket.AssignedAtUtc = CreatedAt;
+        ticket.StartedWorkAtUtc = null;
+
+        DateTime now = CreatedAt.AddMinutes(120 + SlaPolicy.AssignmentStartGraceMinutes + 1);
+
+        Assert.True(SlaPolicy.IsAssignmentStartGraceExceeded(ticket, 120, now));
+    }
+
+    [Fact]
+    public void IsAssignmentStartGraceExceeded_ReturnsFalse_WithinGracePeriod()
+    {
+        Ticket ticket = CreateTicket(CreatedAt.AddHours(4));
+        ticket.AssignedAtUtc = CreatedAt;
+        ticket.StartedWorkAtUtc = null;
+
+        DateTime now = CreatedAt.AddMinutes(120 + SlaPolicy.AssignmentStartGraceMinutes - 1);
+
+        Assert.False(SlaPolicy.IsAssignmentStartGraceExceeded(ticket, 120, now));
+    }
+
+    [Fact]
+    public void IsAssignmentStartGraceExceeded_ReturnsFalse_WhenWorkStarted()
+    {
+        Ticket ticket = CreateTicket(CreatedAt.AddHours(4));
+        ticket.AssignedAtUtc = CreatedAt;
+        ticket.StartedWorkAtUtc = CreatedAt.AddMinutes(10);
+
+        Assert.False(SlaPolicy.IsAssignmentStartGraceExceeded(
+            ticket, 120, CreatedAt.AddDays(1)));
+    }
+
+    [Fact]
+    public void IsAssignmentStartGraceExceeded_ReturnsFalse_WhenMaxMinutesIsZero()
+    {
+        Ticket ticket = CreateTicket(CreatedAt.AddHours(4));
+        ticket.AssignedAtUtc = CreatedAt;
+        ticket.StartedWorkAtUtc = null;
+
+        Assert.False(SlaPolicy.IsAssignmentStartGraceExceeded(ticket, 0, CreatedAt.AddDays(1)));
+    }
+
+    [Fact]
+    public void IsAssignmentStartGraceExceeded_ReturnsFalse_WhenNotAssigned()
+    {
+        Ticket ticket = CreateTicket(CreatedAt.AddHours(4));
+        ticket.AssignedAtUtc = null;
+        ticket.StartedWorkAtUtc = null;
+
+        Assert.False(SlaPolicy.IsAssignmentStartGraceExceeded(ticket, 120, CreatedAt.AddDays(1)));
+    }
 }

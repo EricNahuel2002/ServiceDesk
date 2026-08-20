@@ -4,6 +4,8 @@ public static class SlaPolicy
 {
     public const int GraceMinutes = 60;
 
+    public const int AssignmentStartGraceMinutes = 30;
+
     public const decimal ExpiringThresholdPercentage = 75m;
 
     public static bool IsExpiring(Ticket ticket, TicketSlaRecord record, DateTime utcNow)
@@ -49,6 +51,24 @@ public static class SlaPolicy
     {
         record.CanceledAtUtc = utcNow;
         record.IsCurrent = false;
+    }
+
+    public static bool IsAssignmentStartGraceExceeded(
+        Ticket ticket,
+        int maxAssignmentToStartMinutes,
+        DateTime utcNow)
+    {
+        if (maxAssignmentToStartMinutes <= 0
+            || ticket.AssignedAtUtc is null
+            || ticket.StartedWorkAtUtc is not null)
+        {
+            return false;
+        }
+
+        DateTime startGraceDeadline = ticket.AssignedAtUtc.Value
+            .AddMinutes(maxAssignmentToStartMinutes + AssignmentStartGraceMinutes);
+
+        return utcNow >= startGraceDeadline;
     }
 
     private static bool HasValidSlaWindow(Ticket ticket, TicketSlaRecord record) =>

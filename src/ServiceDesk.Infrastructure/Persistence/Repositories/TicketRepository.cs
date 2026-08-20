@@ -148,6 +148,17 @@ public sealed class TicketRepository : ITicketRepository
             .Include(ticket => ticket.SlaRecords)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Ticket>> GetAssignedUnstartedTicketsAsync(CancellationToken cancellationToken = default) =>
+        await _context.Tickets
+            .Where(ticket => ticket.ResolvedAtUtc == null
+                && ticket.AssignedToId != null
+                && ticket.AssignedAtUtc != null
+                && ticket.StartedWorkAtUtc == null
+                && ticket.Priority != null
+                && ticket.SlaRecords.Any(record => record.IsCurrent && record.CanceledAtUtc == null))
+            .Include(ticket => ticket.SlaRecords)
+            .ToListAsync(cancellationToken);
+
     public async Task<TicketSlaRecord?> GetCurrentSlaRecordAsync(
         Guid ticketId,
         CancellationToken cancellationToken = default) =>
@@ -174,7 +185,17 @@ public sealed class TicketRepository : ITicketRepository
         await _context.TicketSlaRecords
             .Where(record => record.CanceledAtUtc != null
                 && record.CanceledNotifiedAtUtc == null
-                && record.TechnicianId != null)
+                && record.TechnicianId != null
+                && record.CanceledReason != SlaRecordCancelReason.AssignmentStartGraceExceeded)
+            .Include(record => record.Ticket)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TicketSlaRecord>> GetSlaRecordsPendingAdminReassignmentNotificationAsync(
+        CancellationToken cancellationToken = default) =>
+        await _context.TicketSlaRecords
+            .Where(record => record.CanceledAtUtc != null
+                && record.CanceledReason == SlaRecordCancelReason.AssignmentStartGraceExceeded
+                && record.AdminReassignmentNotifiedAtUtc == null)
             .Include(record => record.Ticket)
             .ToListAsync(cancellationToken);
 

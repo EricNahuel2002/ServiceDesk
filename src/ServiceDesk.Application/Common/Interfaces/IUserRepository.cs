@@ -11,4 +11,8 @@ public interface IUserRepository
     Task<IReadOnlyList<TechnicianDto>> GetTechniciansAsync(Guid companyId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<UserListItemDto>> GetAllByCompanyIdAsync(Guid companyId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ApplicationUser>> GetActiveAdministratorsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default);
 }

@@ -9,6 +9,8 @@ internal sealed class FakeUserRepository : IUserRepository
 {
     public ApplicationUser? User { get; set; }
 
+    public List<ApplicationUser> Administrators { get; } = [];
+
     public Task<ApplicationUser?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(User);
 
@@ -16,6 +18,11 @@ internal sealed class FakeUserRepository : IUserRepository
         Guid companyId,
         CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
+
+    public Task<IReadOnlyList<ApplicationUser>> GetActiveAdministratorsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ApplicationUser>>(Administrators);
 
     public Task<IReadOnlyList<UserListItemDto>> GetAllByCompanyIdAsync(
         Guid companyId,

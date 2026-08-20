@@ -1,6 +1,7 @@
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Domain.Identity;
+using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Application.Features.Sla;
@@ -10,17 +11,20 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
     private readonly ITicketRepository _tickets;
     private readonly ICatalogRepository _catalog;
     private readonly IUserRepository _users;
+    private readonly ISlaRepository _slaRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public SlaMonitoringService(
         ITicketRepository tickets,
         ICatalogRepository catalog,
         IUserRepository users,
+        ISlaRepository slaRepository,
         IUnitOfWork unitOfWork)
     {
         _tickets = tickets;
         _catalog = catalog;
         _users = users;
+        _slaRepository = slaRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -165,6 +169,7 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
             }
 
             SlaPolicy.MarkCanceled(current, utcNow);
+            current.CanceledReason = SlaRecordCancelReason.SlaGraceExceeded;
 
             ticket.AssignedToId = null;
 
@@ -198,6 +203,115 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    public async Task ApplyAssignmentStartGraceExpirationsAsync(
+        DateTime utcNow,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<Ticket> tickets = await _tickets.GetAssignedUnstartedTicketsAsync(cancellationToken);
+
+        bool changed = false;
+
+        foreach (Ticket ticket in tickets)
+        {
+            TicketSlaRecord? current = GetCurrentRecord(ticket);
+
+            if (current is null || current.CanceledAtUtc is not null)
+            {
+                continue;
+            }
+
+            CompanyBusinessHours? businessHours = await _slaRepository.GetBusinessHoursAsync(
+                ticket.CompanyId,
+                cancellationToken);
+
+            int maxAssignmentToStartMinutes = businessHours?.MaxAssignmentToStartMinutes ?? 0;
+
+            if (!SlaPolicy.IsAssignmentStartGraceExceeded(ticket, maxAssignmentToStartMinutes, utcNow))
+            {
+                continue;
+            }
+
+            SlaPolicy.MarkCanceled(current, utcNow);
+            current.CanceledReason = SlaRecordCancelReason.AssignmentStartGraceExceeded;
+
+            ticket.AssignedToId = null;
+
+            Guid? nuevoStatusId = await _catalog.FindStatusByNameAsync(
+                ticket.CompanyId,
+                "Nuevo",
+                cancellationToken);
+
+            if (nuevoStatusId is null)
+            {
+                throw new InvalidOperationException(
+                    $"No se encontró el estado 'Nuevo' para la empresa {ticket.CompanyId}.");
+            }
+
+            ticket.StatusId = nuevoStatusId.Value;
+
+            _tickets.AddComment(new TicketComment
+            {
+                Id = Guid.NewGuid(),
+                TicketId = ticket.Id,
+                AuthorId = null,
+                Body = "El técnico asignado no inició el ticket dentro del tiempo máximo permitido " +
+                       "más 30 minutos de gracia. Fue desasignado y el ticket queda pendiente de nueva asignación.",
+                IsInternal = true
+            });
+
+            changed = true;
+        }
+
+        if (changed)
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<IReadOnlyList<AdminReassignmentNotification>> GetPendingAdminReassignmentNotificationsAsync(
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<TicketSlaRecord> records =
+            await _tickets.GetSlaRecordsPendingAdminReassignmentNotificationAsync(cancellationToken);
+
+        List<AdminReassignmentNotification> notifications = [];
+
+        foreach (TicketSlaRecord record in records)
+        {
+            AdminReassignmentNotification? notification = await BuildAdminReassignmentNotificationAsync(
+                record,
+                cancellationToken);
+
+            if (notification is not null)
+            {
+                notifications.Add(notification);
+            }
+        }
+
+        return notifications;
+    }
+
+    public async Task MarkAdminReassignmentNotifiedAsync(
+        IReadOnlyCollection<Guid> recordIds,
+        CancellationToken cancellationToken)
+    {
+        if (recordIds.Count == 0)
+        {
+            return;
+        }
+
+        IReadOnlyList<TicketSlaRecord> records = await _tickets.GetSlaRecordsByIdsAsync(recordIds, cancellationToken);
+
+        DateTime now = DateTime.UtcNow;
+
+        foreach (TicketSlaRecord record in records)
+        {
+            record.AdminReassignmentNotifiedAtUtc = now;
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<SlaCanceledNotification>> GetPendingSlaCanceledNotificationsAsync(
@@ -318,4 +432,51 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
 
     private static TicketSlaRecord? GetCurrentRecord(Ticket ticket) =>
         ticket.SlaRecords.SingleOrDefault(r => r.IsCurrent && r.CanceledAtUtc is null);
+
+    private async Task<AdminReassignmentNotification?> BuildAdminReassignmentNotificationAsync(
+        TicketSlaRecord record,
+        CancellationToken cancellationToken)
+    {
+        if (record.Ticket is null
+            || record.TechnicianId is null
+            || record.Ticket.AssignedAtUtc is null)
+        {
+            return null;
+        }
+
+        ApplicationUser? technician = await _users.GetByIdAsync(record.TechnicianId.Value, cancellationToken);
+
+        IReadOnlyList<ApplicationUser> administrators =
+            await _users.GetActiveAdministratorsAsync(record.Ticket.CompanyId, cancellationToken);
+
+        if (technician is null || administrators.Count == 0)
+        {
+            return null;
+        }
+
+        CompanyBusinessHours? businessHours = await _slaRepository.GetBusinessHoursAsync(
+            record.Ticket.CompanyId,
+            cancellationToken);
+
+        int maxAssignmentToStartMinutes = businessHours?.MaxAssignmentToStartMinutes ?? 0;
+
+        DateTime startGraceDeadline = record.Ticket.AssignedAtUtc.Value
+            .AddMinutes(maxAssignmentToStartMinutes + SlaPolicy.AssignmentStartGraceMinutes);
+
+        return new AdminReassignmentNotification
+        {
+            RecordId = record.Id,
+            TicketId = record.TicketId,
+            Title = record.Ticket.Title,
+            PriorityName = record.Priority.ToString(),
+            TechnicianFirstName = technician.FirstName,
+            TechnicianLastName = technician.LastName,
+            AssignedAtUtc = record.Ticket.AssignedAtUtc.Value,
+            StartGraceDeadlineUtc = startGraceDeadline,
+            AdminEmails = administrators
+                .Select(admin => admin.Email ?? string.Empty)
+                .Where(email => !string.IsNullOrWhiteSpace(email))
+                .ToList()
+        };
+    }
 }

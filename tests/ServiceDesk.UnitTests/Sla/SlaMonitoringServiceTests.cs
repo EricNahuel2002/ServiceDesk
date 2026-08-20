@@ -2,6 +2,7 @@ using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.Features.Sla;
 using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
+using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
 using ServiceDesk.UnitTests.Fakes;
 
@@ -14,12 +15,13 @@ public sealed class SlaMonitoringServiceTests
     private readonly FakeTicketRepository _tickets = new();
     private readonly FakeCatalogRepository _catalog = new();
     private readonly FakeUserRepository _users = new();
+    private readonly FakeSlaRepository _sla = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly SlaMonitoringService _service;
 
     public SlaMonitoringServiceTests()
     {
-        _service = new SlaMonitoringService(_tickets, _catalog, _users, _unitOfWork);
+        _service = new SlaMonitoringService(_tickets, _catalog, _users, _sla, _unitOfWork);
     }
 
     [Fact]
@@ -219,6 +221,129 @@ public sealed class SlaMonitoringServiceTests
         await _service.MarkSlaCanceledNotifiedAsync([record.Id], CancellationToken.None);
 
         Assert.NotNull(record.CanceledNotifiedAtUtc);
+        Assert.Equal(1, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task ApplyAssignmentStartGraceExpirationsAsync_UnassignsAndCancelsRecord()
+    {
+        Ticket ticket = CreateTicket(Now.AddHours(-8), TicketPriority.Media, Now.AddHours(-2));
+        ticket.AssignedAtUtc = Now.AddMinutes(-200);
+        ticket.StartedWorkAtUtc = null;
+        TicketSlaRecord record = CreateRecord(ticket, 4);
+        _tickets.SlaTickets.Add(ticket);
+        _tickets.SlaRecords.Add(record);
+        ticket.SlaRecords.Add(record);
+        _catalog.NuevoStatusId = Guid.NewGuid();
+        _sla.BusinessHours = new CompanyBusinessHours { MaxAssignmentToStartMinutes = 120 };
+
+        await _service.ApplyAssignmentStartGraceExpirationsAsync(Now, CancellationToken.None);
+
+        Assert.Equal(Now, record.CanceledAtUtc);
+        Assert.Equal(SlaRecordCancelReason.AssignmentStartGraceExceeded, record.CanceledReason);
+        Assert.False(record.IsCurrent);
+        Assert.Null(ticket.AssignedToId);
+        Assert.Equal(_catalog.NuevoStatusId, ticket.StatusId);
+        TicketComment comment = Assert.Single(_tickets.Comments);
+        Assert.Null(comment.AuthorId);
+        Assert.True(comment.IsInternal);
+        Assert.Equal(1, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task ApplyAssignmentStartGraceExpirationsAsync_DoesNothingWithinGrace()
+    {
+        Ticket ticket = CreateTicket(Now.AddHours(-8), TicketPriority.Media, Now.AddHours(-2));
+        ticket.AssignedAtUtc = Now.AddMinutes(-100);
+        ticket.StartedWorkAtUtc = null;
+        TicketSlaRecord record = CreateRecord(ticket, 4);
+        _tickets.SlaTickets.Add(ticket);
+        _tickets.SlaRecords.Add(record);
+        ticket.SlaRecords.Add(record);
+        _catalog.NuevoStatusId = Guid.NewGuid();
+        _sla.BusinessHours = new CompanyBusinessHours { MaxAssignmentToStartMinutes = 120 };
+
+        await _service.ApplyAssignmentStartGraceExpirationsAsync(Now, CancellationToken.None);
+
+        Assert.Null(record.CanceledAtUtc);
+        Assert.NotNull(ticket.AssignedToId);
+        Assert.Empty(_tickets.Comments);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task ApplyAssignmentStartGraceExpirationsAsync_SkipsStartedTicket()
+    {
+        Ticket ticket = CreateTicket(Now.AddHours(-8), TicketPriority.Media, Now.AddHours(-2));
+        ticket.AssignedAtUtc = Now.AddMinutes(-200);
+        ticket.StartedWorkAtUtc = Now.AddMinutes(-150);
+        TicketSlaRecord record = CreateRecord(ticket, 4);
+        _tickets.SlaTickets.Add(ticket);
+        _tickets.SlaRecords.Add(record);
+        ticket.SlaRecords.Add(record);
+        _catalog.NuevoStatusId = Guid.NewGuid();
+        _sla.BusinessHours = new CompanyBusinessHours { MaxAssignmentToStartMinutes = 120 };
+
+        await _service.ApplyAssignmentStartGraceExpirationsAsync(Now, CancellationToken.None);
+
+        Assert.Null(record.CanceledAtUtc);
+        Assert.NotNull(ticket.AssignedToId);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task GetPendingAdminReassignmentNotificationsAsync_ReturnsNotificationWithAdminEmails()
+    {
+        Ticket ticket = CreateTicket(Now.AddHours(-8), TicketPriority.Media, Now.AddHours(-2));
+        ticket.AssignedAtUtc = Now.AddMinutes(-200);
+        ticket.Title = "Impresora rota";
+        TicketSlaRecord record = CreateRecord(ticket, 4);
+        record.CanceledAtUtc = Now.AddMinutes(-5);
+        record.CanceledReason = SlaRecordCancelReason.AssignmentStartGraceExceeded;
+        record.Ticket = ticket;
+        _tickets.SlaRecords.Add(record);
+
+        _users.User = new ApplicationUser
+        {
+            Id = record.TechnicianId!.Value,
+            FirstName = "Luis",
+            LastName = "Pérez",
+            Email = "luis@servicedesk.local"
+        };
+
+        _users.Administrators.Add(new ApplicationUser
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Ana",
+            Email = "ana@servicedesk.local"
+        });
+
+        _sla.BusinessHours = new CompanyBusinessHours { MaxAssignmentToStartMinutes = 120 };
+
+        IReadOnlyList<AdminReassignmentNotification> notifications =
+            await _service.GetPendingAdminReassignmentNotificationsAsync(CancellationToken.None);
+
+        AdminReassignmentNotification notification = Assert.Single(notifications);
+        Assert.Equal(record.Id, notification.RecordId);
+        Assert.Equal("Impresora rota", notification.Title);
+        Assert.Equal("Luis", notification.TechnicianFirstName);
+        Assert.Equal(Now.AddMinutes(-50), notification.StartGraceDeadlineUtc);
+        string adminEmail = Assert.Single(notification.AdminEmails);
+        Assert.Equal("ana@servicedesk.local", adminEmail);
+    }
+
+    [Fact]
+    public async Task MarkAdminReassignmentNotifiedAsync_SetsMarker()
+    {
+        Ticket ticket = CreateTicket(Now.AddHours(-8), TicketPriority.Media, Now.AddHours(-2));
+        TicketSlaRecord record = CreateRecord(ticket, 4);
+        record.CanceledAtUtc = Now.AddMinutes(-5);
+        record.CanceledReason = SlaRecordCancelReason.AssignmentStartGraceExceeded;
+        _tickets.SlaRecords.Add(record);
+
+        await _service.MarkAdminReassignmentNotifiedAsync([record.Id], CancellationToken.None);
+
+        Assert.NotNull(record.AdminReassignmentNotifiedAtUtc);
         Assert.Equal(1, _unitOfWork.SaveCount);
     }
 

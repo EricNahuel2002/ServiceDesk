@@ -21,6 +21,10 @@ public class TicketSlaRecord : BaseEntity
 
     public DateTime? CanceledAtUtc { get; set; }
 
+    public SlaRecordCancelReason? CanceledReason { get; set; }
+
+    public DateTime? AdminReassignmentNotifiedAtUtc { get; set; }
+
     public DateTime? ExpiringNotifiedAtUtc { get; set; }
 
     public DateTime? BreachedNotifiedAtUtc { get; set; }

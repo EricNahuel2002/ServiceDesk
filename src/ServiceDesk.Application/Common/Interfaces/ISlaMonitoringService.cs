@@ -24,6 +24,17 @@ public interface ISlaMonitoringService
         DateTime utcNow,
         CancellationToken cancellationToken = default);
 
+    Task ApplyAssignmentStartGraceExpirationsAsync(
+        DateTime utcNow,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AdminReassignmentNotification>> GetPendingAdminReassignmentNotificationsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task MarkAdminReassignmentNotifiedAsync(
+        IReadOnlyCollection<Guid> recordIds,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<SlaCanceledNotification>> GetPendingSlaCanceledNotificationsAsync(
         CancellationToken cancellationToken = default);
 

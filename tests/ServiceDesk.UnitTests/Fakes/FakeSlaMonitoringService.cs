@@ -11,19 +11,27 @@ internal sealed class FakeSlaMonitoringService : ISlaMonitoringService
 
     public IReadOnlyList<SlaCanceledNotification> CanceledNotifications { get; set; } = [];
 
+    public IReadOnlyList<AdminReassignmentNotification> AdminReassignmentNotifications { get; set; } = [];
+
     public List<Guid> MarkedExpiring { get; } = [];
 
     public List<Guid> MarkedBreached { get; } = [];
 
     public List<Guid> MarkedCanceled { get; } = [];
 
+    public List<Guid> MarkedAdminReassignment { get; } = [];
+
     public int GraceExpirationsApplied { get; private set; }
+
+    public int AssignmentStartGraceExpirationsApplied { get; private set; }
 
     public bool ThrowOnExpiring { get; set; }
 
     public bool ThrowOnBreached { get; set; }
 
     public bool ThrowOnCanceled { get; set; }
+
+    public bool ThrowOnAdminReassignment { get; set; }
 
     public Task<IReadOnlyList<SlaExpiringNotification>> GetTicketsPendingExpiringNotificationAsync(
         DateTime utcNow,
@@ -92,6 +100,35 @@ internal sealed class FakeSlaMonitoringService : ISlaMonitoringService
         CancellationToken cancellationToken = default)
     {
         MarkedCanceled.AddRange(recordIds);
+
+        return Task.CompletedTask;
+    }
+
+    public Task ApplyAssignmentStartGraceExpirationsAsync(
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        AssignmentStartGraceExpirationsApplied++;
+
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<AdminReassignmentNotification>> GetPendingAdminReassignmentNotificationsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (ThrowOnAdminReassignment)
+        {
+            throw new InvalidOperationException("Fallo simulado al detectar reasignaciones pendientes.");
+        }
+
+        return Task.FromResult(AdminReassignmentNotifications);
+    }
+
+    public Task MarkAdminReassignmentNotifiedAsync(
+        IReadOnlyCollection<Guid> recordIds,
+        CancellationToken cancellationToken = default)
+    {
+        MarkedAdminReassignment.AddRange(recordIds);
 
         return Task.CompletedTask;
     }
