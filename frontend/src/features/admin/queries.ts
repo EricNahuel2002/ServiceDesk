@@ -16,6 +16,10 @@ import {
   updateSlaConfiguration,
   getBusinessHours,
   updateBusinessHours,
+  getAuditTechnicians,
+  getAuditTechnicianTickets,
+  getAuditTicketHistory,
+  getAuditTicketChat,
 } from './api'
 import type { TicketDto, UpdateTicketRequest, AssignTicketRequest } from '../tickets/types'
 import type {
@@ -148,5 +152,33 @@ export function useUpdateBusinessHours() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'sla', 'business-hours'] })
     },
+  })
+}
+
+export function useAuditTechnicians() {
+  return useQuery({ queryKey: ['admin', 'audits', 'technicians'], queryFn: getAuditTechnicians })
+}
+
+export function useAuditTechnicianTickets(technicianId: string) {
+  return useQuery({
+    queryKey: ['admin', 'audits', 'technicians', technicianId, 'tickets'],
+    queryFn: () => getAuditTechnicianTickets(technicianId),
+    enabled: Boolean(technicianId),
+  })
+}
+
+export function useAuditTicketHistory(ticketId: string) {
+  return useQuery({
+    queryKey: ['admin', 'audits', 'tickets', ticketId, 'history'],
+    queryFn: () => getAuditTicketHistory(ticketId),
+    enabled: Boolean(ticketId),
+  })
+}
+
+export function useAuditTicketChat(ticketId: string) {
+  return useQuery({
+    queryKey: ['admin', 'audits', 'tickets', ticketId, 'chat'],
+    queryFn: () => getAuditTicketChat(ticketId),
+    enabled: Boolean(ticketId),
   })
 }

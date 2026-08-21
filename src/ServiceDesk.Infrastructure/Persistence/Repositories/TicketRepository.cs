@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
+using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Infrastructure.Persistence.Repositories;
@@ -227,4 +228,28 @@ public sealed class TicketRepository : ITicketRepository
     public void AddFeedback(TicketFeedback feedback) => _context.TicketFeedbacks.Add(feedback);
 
     public void AddTechnicianReport(TechnicianReport report) => _context.TechnicianReports.Add(report);
+
+    public async Task<IReadOnlyList<TicketDto>> GetAssignedToInCompanyAsync(
+        Guid assignedToId,
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Tickets
+            .AsNoTracking()
+            .Where(ticket => ticket.AssignedToId == assignedToId && ticket.CompanyId == companyId)
+            .OrderByDescending(ticket => ticket.CreatedAtUtc)
+            .Select(TicketProjection)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<AuditLog>> GetTicketAuditLogsAsync(
+        Guid ticketId,
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await _context.AuditLogs
+            .AsNoTracking()
+            .Where(log => log.EntityId == ticketId && log.EntityType == "Ticket" && log.CompanyId == companyId)
+            .Include(log => log.User)
+            .OrderBy(log => log.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+    public void AddAuditLog(AuditLog auditLog) => _context.AuditLogs.Add(auditLog);
 }

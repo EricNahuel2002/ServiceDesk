@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.Features.Auth;
+using ServiceDesk.Application.Features.Audits;
 using ServiceDesk.Application.Features.Catalog;
 using ServiceDesk.Application.Features.Chat;
 using ServiceDesk.Application.Features.Sla;
@@ -24,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<IMetricsService, MetricsService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IChatService, ChatService>();
+        services.AddScoped<IAuditService, AuditService>();
 
         return services;
     }

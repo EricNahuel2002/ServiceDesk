@@ -1,6 +1,7 @@
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
+using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.UnitTests.Fakes;
@@ -14,6 +15,8 @@ internal sealed class FakeTicketRepository : ITicketRepository
     public List<TicketSlaRecord> SlaRecords { get; } = [];
 
     public List<TicketComment> Comments { get; } = [];
+
+    public List<AuditLog> AuditLogs { get; } = [];
 
     public Task<TicketNotificationInfo?> GetTicketNotificationInfoAsync(
         Guid ticketId,
@@ -70,6 +73,21 @@ internal sealed class FakeTicketRepository : ITicketRepository
     public void AddFeedback(TicketFeedback feedback) => throw new NotSupportedException();
 
     public void AddTechnicianReport(TechnicianReport report) => throw new NotSupportedException();
+
+    public Task<IReadOnlyList<TicketDto>> GetAssignedToInCompanyAsync(
+        Guid assignedToId,
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<TicketDto>>(new List<TicketDto>());
+
+    public Task<IReadOnlyList<AuditLog>> GetTicketAuditLogsAsync(
+        Guid ticketId,
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<AuditLog>>(
+            AuditLogs.Where(log => log.EntityId == ticketId && log.CompanyId == companyId).ToList());
+
+    public void AddAuditLog(AuditLog auditLog) => AuditLogs.Add(auditLog);
 
     public Task<IReadOnlyList<TicketDto>> GetMineAsync(
         Guid createdById,

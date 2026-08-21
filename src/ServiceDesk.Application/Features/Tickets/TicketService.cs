@@ -6,6 +6,7 @@ using ServiceDesk.Application.Common.Validation;
 using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Application.Features.Tickets.Validators;
+using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Common;
 using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
@@ -131,6 +132,8 @@ public sealed class TicketService : ITicketService
 
             _tickets.Add(ticket);
 
+            LogAudit(ticket, TicketAuditActions.Created, "Ticket creado", userId);
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
         catch
@@ -227,6 +230,8 @@ public sealed class TicketService : ITicketService
         ticket.StartedWorkAtUtc = DateTime.UtcNow;
         ticket.StatusId = enProgresoStatusId.Value;
 
+        LogAudit(ticket, TicketAuditActions.WorkStarted, "Trabajo iniciado", _currentUser.UserId);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await EnqueueClientWorkNotificationAsync(ticket.Id, NotificationEvents.WorkStarted, cancellationToken);
@@ -284,17 +289,23 @@ public sealed class TicketService : ITicketService
         ticket.StatusId = closedStatusId.Value;
         ticket.ResolvedAtUtc = DateTime.UtcNow;
 
+        string? resolutionNote = null;
+
         if (!string.IsNullOrWhiteSpace(request.ResolutionNote))
         {
+            resolutionNote = request.ResolutionNote.Trim();
+
             _tickets.AddComment(new TicketComment
             {
                 Id = Guid.NewGuid(),
                 TicketId = ticket.Id,
                 AuthorId = technician.Id,
-                Body = request.ResolutionNote.Trim(),
+                Body = resolutionNote,
                 IsInternal = false
             });
         }
+
+        LogAudit(ticket, TicketAuditActions.Resolved, "Ticket cerrado", technician.Id, resolutionNote);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -316,6 +327,8 @@ public sealed class TicketService : ITicketService
         {
             throw new NotFoundException($"El ticket con id {id} no existe.");
         }
+
+        Guid? previousAssignedToId = ticket.AssignedToId;
 
         if (request.AssignedToId.HasValue)
         {
@@ -360,6 +373,19 @@ public sealed class TicketService : ITicketService
         else
         {
             await DeactivateCurrentSlaRecordAsync(ticket, cancellationToken);
+        }
+
+        if (wasReassigned)
+        {
+            string technicianName = await GetTechnicianNameAsync(request.AssignedToId!.Value, cancellationToken);
+            string action = previousAssignedToId.HasValue
+                ? TicketAuditActions.Reassigned
+                : TicketAuditActions.Assigned;
+            string description = action == TicketAuditActions.Reassigned
+                ? $"Reasignado a {technicianName}"
+                : $"Asignado a {technicianName}";
+
+            LogAudit(ticket, action, description, _currentUser.UserId);
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -416,6 +442,19 @@ public sealed class TicketService : ITicketService
                 cancellationToken);
 
             await RefreshCurrentSlaRecordAsync(ticket, slaLimitHours, request.AssignedToId, cancellationToken);
+        }
+
+        if (wasReassigned)
+        {
+            string technicianName = await GetTechnicianNameAsync(request.AssignedToId, cancellationToken);
+            string action = ticket.AssignedToId != request.AssignedToId && ticket.AssignedToId != null
+                ? TicketAuditActions.Reassigned
+                : TicketAuditActions.Assigned;
+            string description = action == TicketAuditActions.Reassigned
+                ? $"Reasignado a {technicianName}"
+                : $"Asignado a {technicianName}";
+
+            LogAudit(ticket, action, description, _currentUser.UserId);
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -477,6 +516,24 @@ public sealed class TicketService : ITicketService
         if (!request.WasSolved)
         {
             await ReopenTicketAsync(ticket, cancellationToken);
+
+            LogAudit(
+                ticket,
+                TicketAuditActions.Reopened,
+                "Reabierto por el cliente",
+                _currentUser.UserId,
+                string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim());
+        }
+        else
+        {
+            string? feedbackComment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
+
+            LogAudit(
+                ticket,
+                TicketAuditActions.FeedbackSubmitted,
+                "Encuesta enviada",
+                _currentUser.UserId,
+                feedbackComment);
         }
 
         _tickets.AddFeedback(feedback);
@@ -558,6 +615,13 @@ public sealed class TicketService : ITicketService
 
             _tickets.AddTechnicianReport(report);
 
+            LogAudit(
+                ticket,
+                TicketAuditActions.TechnicianReport,
+                "Reporte técnico enviado",
+                _currentUser.UserId,
+                string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim());
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
         catch
@@ -633,6 +697,18 @@ public sealed class TicketService : ITicketService
             ContentType = attachment.ContentType,
             FileName = attachment.FileName
         };
+    }
+
+    private async Task<string> GetTechnicianNameAsync(Guid technicianId, CancellationToken cancellationToken)
+    {
+        ApplicationUser? technician = await _users.GetByIdAsync(technicianId, cancellationToken);
+
+        if (technician is null)
+        {
+            return string.Empty;
+        }
+
+        return $"{technician.FirstName} {technician.LastName}".Trim();
     }
 
     private async Task<ApplicationUser> EnsureTechnicianValidAsync(Guid technicianId, CancellationToken cancellationToken)
@@ -841,6 +917,21 @@ public sealed class TicketService : ITicketService
 
     private static string BuildReportBlobName(Guid companyId, Guid ticketId, Guid reportId, Guid attachmentId) =>
         $"{companyId:N}/{ticketId:N}/technician-reports/{reportId:N}/{attachmentId:N}";
+
+    private void LogAudit(Ticket ticket, string action, string description, Guid? actorId, string? details = null)
+    {
+        _tickets.AddAuditLog(new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            UserId = actorId,
+            CompanyId = ticket.CompanyId,
+            EntityType = "Ticket",
+            EntityId = ticket.Id,
+            Action = action,
+            Description = description,
+            Details = details
+        });
+    }
 
     private async Task<IReadOnlyList<TicketDto>> EnrichWithSlaDataAsync(
         IReadOnlyList<TicketDto> tickets,

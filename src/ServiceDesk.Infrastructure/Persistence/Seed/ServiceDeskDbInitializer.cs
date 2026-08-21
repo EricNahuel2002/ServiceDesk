@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Catalog;
 using ServiceDesk.Domain.Common;
 using ServiceDesk.Domain.Companies;
@@ -270,50 +271,83 @@ public sealed class ServiceDeskDbInitializer
 
         DateTime now = DateTime.UtcNow;
 
-        _context.Tickets.AddRange(
-            CreateTicket(
-                company.Id,
-                cliente.Id,
-                hardwareId,
-                null,
-                nuevoId,
-                "PC no enciende",
-                "La PC de recepción no enciende desde esta mañana.",
-                responseDeadline: now.AddHours(4)),
-            CreateTicket(
-                company.Id,
-                cliente.Id,
-                redId,
-                TicketPriority.Alta,
-                enProgresoId,
-                "VPN no funciona",
-                "No puedo conectarme a la VPN desde casa.",
-                assignedToId: tecnico.Id,
-                assignedAtUtc: now.AddHours(-1),
-                responseDeadline: now.AddHours(2),
-                startedWorkAt: now.AddMinutes(-30)),
-            CreateTicket(
-                company.Id,
-                cliente.Id,
-                hardwareId,
-                TicketPriority.Media,
-                resueltoId,
-                "Impresora no imprime",
-                "La impresora del piso 3 quedó con un atasco de papel.",
-                assignedToId: tecnico.Id,
-                assignedAtUtc: now.AddHours(-2),
-                resolved: true,
-                responseDeadline: now.AddHours(4),
-                startedWorkAt: now.AddMinutes(-60)),
-            CreateTicket(
-                company.Id,
-                cliente.Id,
-                softwareId,
-                null,
-                nuevoId,
-                "Solicitud de licencia",
-                "Necesito una licencia de Microsoft 365 para el equipo de ventas.",
-                responseDeadline: now.AddHours(8)));
+        Ticket ticket1 = CreateTicket(
+            company.Id,
+            cliente.Id,
+            hardwareId,
+            null,
+            nuevoId,
+            "PC no enciende",
+            "La PC de recepción no enciende desde esta mañana.",
+            responseDeadline: now.AddHours(4));
+
+        Ticket ticket2 = CreateTicket(
+            company.Id,
+            cliente.Id,
+            redId,
+            TicketPriority.Alta,
+            enProgresoId,
+            "VPN no funciona",
+            "No puedo conectarme a la VPN desde casa.",
+            assignedToId: tecnico.Id,
+            assignedAtUtc: now.AddHours(-1),
+            responseDeadline: now.AddHours(2),
+            startedWorkAt: now.AddMinutes(-30));
+
+        Ticket ticket3 = CreateTicket(
+            company.Id,
+            cliente.Id,
+            hardwareId,
+            TicketPriority.Media,
+            resueltoId,
+            "Impresora no imprime",
+            "La impresora del piso 3 quedó con un atasco de papel.",
+            assignedToId: tecnico.Id,
+            assignedAtUtc: now.AddHours(-2),
+            resolved: true,
+            responseDeadline: now.AddHours(4),
+            startedWorkAt: now.AddMinutes(-60));
+
+        Ticket ticket4 = CreateTicket(
+            company.Id,
+            cliente.Id,
+            softwareId,
+            null,
+            nuevoId,
+            "Solicitud de licencia",
+            "Necesito una licencia de Microsoft 365 para el equipo de ventas.",
+            responseDeadline: now.AddHours(8));
+
+        _context.Tickets.AddRange(ticket1, ticket2, ticket3, ticket4);
+
+        _context.AuditLogs.AddRange(
+            CreateAuditLog(company.Id, cliente.Id, ticket1.Id, TicketAuditActions.Created, "Ticket creado",
+                now.AddMinutes(-5)),
+            CreateAuditLog(company.Id, cliente.Id, ticket2.Id, TicketAuditActions.Created, "Ticket creado",
+                now.AddHours(-2)),
+            CreateAuditLog(company.Id, cliente.Id, ticket2.Id, TicketAuditActions.Assigned, $"Asignado a {tecnico.FirstName} {tecnico.LastName}",
+                now.AddHours(-1)),
+            CreateAuditLog(company.Id, tecnico.Id, ticket2.Id, TicketAuditActions.WorkStarted, "Trabajo iniciado",
+                now.AddMinutes(-30)),
+            CreateAuditLog(company.Id, cliente.Id, ticket3.Id, TicketAuditActions.Created, "Ticket creado",
+                now.AddHours(-4)),
+            CreateAuditLog(company.Id, cliente.Id, ticket3.Id, TicketAuditActions.Assigned, $"Asignado a {tecnico.FirstName} {tecnico.LastName}",
+                now.AddHours(-3)),
+            CreateAuditLog(company.Id, tecnico.Id, ticket3.Id, TicketAuditActions.WorkStarted, "Trabajo iniciado",
+                now.AddHours(-1)),
+            CreateAuditLog(company.Id, tecnico.Id, ticket3.Id, TicketAuditActions.Resolved, "Ticket cerrado",
+                now.AddMinutes(-30)),
+            CreateAuditLog(company.Id, cliente.Id, ticket4.Id, TicketAuditActions.Created, "Ticket creado",
+                now.AddMinutes(-10)));
+
+        _context.ChatMessages.AddRange(
+            CreateChatMessage(ticket2.Id, cliente.Id, "Hola, no puedo conectarme a la VPN desde mi casa.", now.AddHours(-1)),
+            CreateChatMessage(ticket2.Id, tecnico.Id, "Hola, ¿qué versión de cliente VPN estás usando?", now.AddMinutes(-50)),
+            CreateChatMessage(ticket2.Id, cliente.Id, "Creo que es la versión 5.0.", now.AddMinutes(-45)),
+            CreateChatMessage(ticket2.Id, tecnico.Id, "Gracias, voy a revisar la configuración del servidor.", now.AddMinutes(-35)),
+            CreateChatMessage(ticket3.Id, cliente.Id, "La impresora del piso 3 tiene un atasco de papel.", now.AddHours(-4)),
+            CreateChatMessage(ticket3.Id, tecnico.Id, "Voy a revisarla ahora.", now.AddHours(-3)),
+            CreateChatMessage(ticket3.Id, tecnico.Id, "Ya quedó lista, podés probar.", now.AddMinutes(-40)));
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -441,5 +475,40 @@ public sealed class ServiceDeskDbInitializer
             throw new InvalidOperationException(
                 $"{message} {string.Join(", ", result.Errors.Select(e => e.Description))}");
         }
+    }
+
+    private static AuditLog CreateAuditLog(
+        Guid companyId,
+        Guid userId,
+        Guid ticketId,
+        string action,
+        string description,
+        DateTime occurredAtUtc,
+        string? details = null)
+    {
+        return new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            CompanyId = companyId,
+            EntityType = "Ticket",
+            EntityId = ticketId,
+            Action = action,
+            Description = description,
+            Details = details,
+            CreatedAtUtc = occurredAtUtc
+        };
+    }
+
+    private static ChatMessage CreateChatMessage(Guid ticketId, Guid senderId, string content, DateTime sentAtUtc)
+    {
+        return new ChatMessage
+        {
+            Id = Guid.NewGuid(),
+            TicketId = ticketId,
+            SenderId = senderId,
+            Content = content,
+            SentAtUtc = sentAtUtc
+        };
     }
 }

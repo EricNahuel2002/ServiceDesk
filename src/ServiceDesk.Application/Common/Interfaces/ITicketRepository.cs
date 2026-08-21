@@ -1,5 +1,6 @@
 using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
+using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Application.Common.Interfaces;
@@ -67,4 +68,16 @@ public interface ITicketRepository
     void AddFeedback(TicketFeedback feedback);
 
     void AddTechnicianReport(TechnicianReport report);
+
+    Task<IReadOnlyList<TicketDto>> GetAssignedToInCompanyAsync(
+        Guid assignedToId,
+        Guid companyId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AuditLog>> GetTicketAuditLogsAsync(
+        Guid ticketId,
+        Guid companyId,
+        CancellationToken cancellationToken = default);
+
+    void AddAuditLog(AuditLog auditLog);
 }
