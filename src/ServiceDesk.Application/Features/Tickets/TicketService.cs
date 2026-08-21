@@ -26,7 +26,6 @@ public sealed class TicketService : ITicketService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
     private readonly ICatalogVerificationService _catalogVerification;
-    private readonly IBusinessHoursCalculator _businessHoursCalculator;
     private readonly IValidator<CreateTicketRequest> _validator;
     private readonly IValidator<UpdateTicketRequest> _updateValidator;
     private readonly IValidator<ResolveTicketRequest> _resolveValidator;
@@ -44,7 +43,6 @@ public sealed class TicketService : ITicketService
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUser,
         ICatalogVerificationService catalogVerification,
-        IBusinessHoursCalculator businessHoursCalculator,
         IValidator<CreateTicketRequest> validator,
         IValidator<UpdateTicketRequest> updateValidator,
         IValidator<ResolveTicketRequest> resolveValidator,
@@ -61,7 +59,6 @@ public sealed class TicketService : ITicketService
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _catalogVerification = catalogVerification;
-        _businessHoursCalculator = businessHoursCalculator;
         _validator = validator;
         _updateValidator = updateValidator;
         _resolveValidator = resolveValidator;
@@ -753,7 +750,7 @@ public sealed class TicketService : ITicketService
             return;
         }
 
-        if (!_businessHoursCalculator.IsWithinBusinessHours(DateTime.UtcNow, businessHours))
+        if (!Domain.Sla.BusinessHoursCalculator.IsWithinBusinessHours(DateTime.UtcNow, businessHours))
         {
             throw new DomainRuleViolationException(
                 "Esta acción no se puede realizar fuera del horario laboral de la empresa.");
@@ -790,7 +787,7 @@ public sealed class TicketService : ITicketService
             return createdAtUtc.AddHours(slaConfig.ResponseTimeHours);
         }
 
-        return _businessHoursCalculator.AddBusinessHours(
+        return Domain.Sla.BusinessHoursCalculator.AddBusinessHours(
             createdAtUtc,
             slaConfig.ResponseTimeHours,
             businessHours);

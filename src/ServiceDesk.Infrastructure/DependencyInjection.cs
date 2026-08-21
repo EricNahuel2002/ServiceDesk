@@ -95,7 +95,7 @@ public static class DependencyInjection
         services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
         services.AddScoped<ISlaRepository, SlaRepository>();
         services.AddScoped<IMetricsRepository, MetricsRepository>();
-        services.AddScoped<IBusinessHoursCalculator, BusinessHoursCalculator>();
+        
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<ServiceDeskDbInitializer>();
