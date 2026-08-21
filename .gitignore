@@ -7,7 +7,6 @@
 .env
 
 # Plan de tarea local (no versionar)
-task.md
 
 # Local app settings (contains secrets) for the Development environment
 appsettings*.Development.json
