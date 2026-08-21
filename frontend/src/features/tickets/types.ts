@@ -32,6 +32,8 @@ export interface TicketDto {
   effectiveSlaLimitHours: number
   slaPercentageElapsed: number
   isOverdue: boolean
+  hasPendingFeedback: boolean
+  canReportTechnician: boolean
   attachments: TicketAttachmentDto[]
 }
 
@@ -48,6 +50,17 @@ export interface UpdateTicketRequest {
 
 export interface AssignTicketRequest {
   assignedToId: string
+}
+
+export interface SubmitTicketFeedbackRequest {
+  wasSolved: boolean
+  rating?: number | null
+  comment?: string | null
+}
+
+export interface CreateTechnicianReportInput {
+  reason?: string | null
+  files: File[]
 }
 
 export interface TechnicianDto {

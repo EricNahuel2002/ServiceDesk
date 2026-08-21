@@ -22,6 +22,12 @@ public interface ITicketRepository
         Guid assignedToId,
         CancellationToken cancellationToken = default);
 
+    Task<Ticket?> GetClientTicketByIdAsync(
+        Guid id,
+        Guid companyId,
+        Guid clientId,
+        CancellationToken cancellationToken = default);
+
     Task<TicketNotificationInfo?> GetTicketNotificationInfoAsync(
         Guid ticketId,
         CancellationToken cancellationToken = default);
@@ -57,4 +63,8 @@ public interface ITicketRepository
     void AddSlaRecord(TicketSlaRecord record);
 
     void AddComment(TicketComment comment);
+
+    void AddFeedback(TicketFeedback feedback);
+
+    void AddTechnicianReport(TechnicianReport report);
 }

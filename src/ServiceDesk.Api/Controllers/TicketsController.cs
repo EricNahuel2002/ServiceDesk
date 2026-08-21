@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Chat;
 using ServiceDesk.Application.DTOs.Tickets;
+using ServiceDesk.Domain.Identity;
 
 namespace ServiceDesk.Api.Controllers;
 
@@ -89,6 +90,57 @@ public sealed class TicketsController : ControllerBase
         IReadOnlyList<ChatMessageDto> messages = await _chatService.GetHistoryAsync(ticketId, cancellationToken);
 
         return Ok(messages);
+    }
+
+    [HttpPost("{ticketId:guid}/feedback")]
+    [Authorize(Policy = AuthPolicies.RequireCliente)]
+    [ProducesResponseType(typeof(TicketDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<TicketDto>> SubmitFeedback(
+        Guid ticketId,
+        SubmitTicketFeedbackRequest request,
+        CancellationToken cancellationToken)
+    {
+        TicketDto ticket = await _ticketService.SubmitFeedbackAsync(ticketId, request, cancellationToken);
+
+        return Ok(ticket);
+    }
+
+    [HttpPost("{ticketId:guid}/technician-report")]
+    [Authorize(Policy = AuthPolicies.RequireCliente)]
+    [ProducesResponseType(typeof(TicketDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<TicketDto>> CreateTechnicianReport(
+        Guid ticketId,
+        [FromForm] CreateTechnicianReportRequest request,
+        IFormFileCollection? files,
+        CancellationToken cancellationToken)
+    {
+        List<TicketFileUpload> uploads = await ReadFilesAsync(files, cancellationToken);
+
+        CreateTechnicianReportRequest requestWithFiles = request with { Files = uploads };
+
+        try
+        {
+            TicketDto ticket = await _ticketService.CreateTechnicianReportAsync(ticketId, requestWithFiles, cancellationToken);
+
+            return CreatedAtAction(nameof(GetMine), new { }, ticket);
+        }
+        finally
+        {
+            foreach (TicketFileUpload upload in uploads)
+            {
+                await upload.Content.DisposeAsync();
+            }
+        }
     }
 
     private static async Task<List<TicketFileUpload>> ReadFilesAsync(

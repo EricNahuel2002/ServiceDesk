@@ -460,8 +460,9 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
 
         int maxAssignmentToStartMinutes = businessHours?.MaxAssignmentToStartMinutes ?? 0;
 
-        DateTime startGraceDeadline = record.Ticket.AssignedAtUtc.Value
-            .AddMinutes(maxAssignmentToStartMinutes + SlaPolicy.AssignmentStartGraceMinutes);
+        DateTime? startGraceDeadline = record.CanceledReason == SlaRecordCancelReason.AssignmentStartGraceExceeded
+            ? record.Ticket.AssignedAtUtc.Value.AddMinutes(maxAssignmentToStartMinutes + SlaPolicy.AssignmentStartGraceMinutes)
+            : null;
 
         return new AdminReassignmentNotification
         {
@@ -469,6 +470,7 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
             TicketId = record.TicketId,
             Title = record.Ticket.Title,
             PriorityName = record.Priority.ToString(),
+            CancelReason = record.CanceledReason!.Value,
             TechnicianFirstName = technician.FirstName,
             TechnicianLastName = technician.LastName,
             AssignedAtUtc = record.Ticket.AssignedAtUtc.Value,

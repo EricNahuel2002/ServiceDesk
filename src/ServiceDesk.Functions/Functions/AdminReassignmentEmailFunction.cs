@@ -2,6 +2,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Notifications;
+using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Functions.Functions;
 
@@ -54,25 +55,45 @@ public sealed class AdminReassignmentEmailFunction
     }
 
     internal static string BuildSubject(AdminReassignmentNotification notification) =>
-        $"Técnico sin respuesta: ticket {notification.Title}";
+        notification.CancelReason == SlaRecordCancelReason.ReopenedByClientFeedback
+            ? $"El cliente solicitó reasignación: ticket {notification.Title}"
+            : $"Técnico sin respuesta: ticket {notification.Title}";
 
     internal static string BuildBody(AdminReassignmentNotification notification) =>
-        $"""
-        Hola,
+        notification.CancelReason == SlaRecordCancelReason.ReopenedByClientFeedback
+            ? $"""
+              Hola,
 
-        El técnico asignado al siguiente ticket no inició el trabajo dentro del tiempo máximo permitido
-        más el tiempo de gracia de 30 minutos:
+              El cliente indicó que su problema no fue resuelto en el siguiente ticket
+              y solicitó la reasignación de un técnico:
 
-        Título: {notification.Title}
-        Prioridad: {notification.PriorityName}
-        Técnico asignado: {notification.TechnicianFirstName} {notification.TechnicianLastName}
-        Asignado el: {notification.AssignedAtUtc:yyyy-MM-dd HH:mm 'UTC'}
-        Debía iniciar antes de: {notification.StartGraceDeadlineUtc:yyyy-MM-dd HH:mm 'UTC'}
+              Título: {notification.Title}
+              Prioridad: {notification.PriorityName}
+              Técnico anterior: {notification.TechnicianFirstName} {notification.TechnicianLastName}
+              Asignado el: {notification.AssignedAtUtc:yyyy-MM-dd HH:mm 'UTC'}
 
-        El ticket fue devuelto al estado 'Nuevo' y queda pendiente de asignación.
-        Ingresá al panel de administración para asignar un nuevo técnico.
+              El ticket fue devuelto al estado 'Nuevo' y queda pendiente de asignación.
+              Ingresá al panel de administración para asignar un nuevo técnico.
 
-        Saludos,
-        ServiceDesk
-        """;
+              Saludos,
+              ServiceDesk
+              """
+            : $"""
+              Hola,
+
+              El técnico asignado al siguiente ticket no inició el trabajo dentro del tiempo máximo permitido
+              más el tiempo de gracia de 30 minutos:
+
+              Título: {notification.Title}
+              Prioridad: {notification.PriorityName}
+              Técnico asignado: {notification.TechnicianFirstName} {notification.TechnicianLastName}
+              Asignado el: {notification.AssignedAtUtc:yyyy-MM-dd HH:mm 'UTC'}
+              Debía iniciar antes de: {notification.StartGraceDeadlineUtc:yyyy-MM-dd HH:mm 'UTC'}
+
+              El ticket fue devuelto al estado 'Nuevo' y queda pendiente de asignación.
+              Ingresá al panel de administración para asignar un nuevo técnico.
+
+              Saludos,
+              ServiceDesk
+              """;
 }

@@ -6,6 +6,8 @@ import { AppShell } from '../../components/layout/AppShell'
 import { useOpenChat } from '../../features/chat/ChatWidgetContext'
 import { useTickets, useIsTicketClosed } from '../../features/tickets/queries'
 import { requireCliente } from '../../features/tickets/auth'
+import { TicketFeedbackCard } from '../../components/tickets/TicketFeedbackCard'
+import { TechnicianReportForm } from '../../components/tickets/TechnicianReportForm'
 import { formatDate } from '../../utils/format'
 import { getPriorityLabel, getPriorityBadgeColor } from '../../utils/priority'
 import { getStatusBadgeColor } from '../../utils/status'
@@ -117,6 +119,14 @@ function ClientTicketDetailPage() {
                 </div>
               </div>
             </Card>
+
+            {isClosed(ticket) && ticket.hasPendingFeedback && (
+              <TicketFeedbackCard ticketId={ticket.id} />
+            )}
+
+            {!isClosed(ticket) && ticket.canReportTechnician && (
+              <TechnicianReportForm ticketId={ticket.id} />
+            )}
 
             {!isClosed(ticket) && ticket.assignedToId && (
               <Card>

@@ -56,8 +56,9 @@ internal sealed class FakeTicketRepository : ITicketRepository
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<TicketSlaRecord>>(SlaRecords
             .Where(record => record.CanceledAtUtc != null
-                && record.CanceledReason == SlaRecordCancelReason.AssignmentStartGraceExceeded
-                && record.AdminReassignmentNotifiedAtUtc == null)
+                && record.AdminReassignmentNotifiedAtUtc == null
+                && (record.CanceledReason == SlaRecordCancelReason.AssignmentStartGraceExceeded
+                    || record.CanceledReason == SlaRecordCancelReason.ReopenedByClientFeedback))
             .ToList());
 
     public void Add(Ticket ticket) => throw new NotSupportedException();
@@ -65,6 +66,10 @@ internal sealed class FakeTicketRepository : ITicketRepository
     public void AddSlaRecord(TicketSlaRecord record) => SlaRecords.Add(record);
 
     public void AddComment(TicketComment comment) => Comments.Add(comment);
+
+    public void AddFeedback(TicketFeedback feedback) => throw new NotSupportedException();
+
+    public void AddTechnicianReport(TechnicianReport report) => throw new NotSupportedException();
 
     public Task<IReadOnlyList<TicketDto>> GetMineAsync(
         Guid createdById,
@@ -97,6 +102,13 @@ internal sealed class FakeTicketRepository : ITicketRepository
         Guid id,
         Guid companyId,
         Guid assignedToId,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<Ticket?> GetClientTicketByIdAsync(
+        Guid id,
+        Guid companyId,
+        Guid clientId,
         CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 

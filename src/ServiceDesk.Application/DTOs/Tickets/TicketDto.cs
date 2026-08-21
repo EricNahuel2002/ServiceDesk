@@ -54,5 +54,9 @@ public sealed record TicketDto
 
     public bool IsOverdue { get; init; }
 
+    public bool HasPendingFeedback { get; init; }
+
+    public bool CanReportTechnician { get; init; }
+
     public IReadOnlyList<TicketAttachmentDto> Attachments { get; init; } = [];
 }

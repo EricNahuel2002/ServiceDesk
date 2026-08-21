@@ -29,6 +29,8 @@ public sealed class TicketService : ITicketService
     private readonly IValidator<CreateTicketRequest> _validator;
     private readonly IValidator<UpdateTicketRequest> _updateValidator;
     private readonly IValidator<ResolveTicketRequest> _resolveValidator;
+    private readonly IValidator<SubmitTicketFeedbackRequest> _feedbackValidator;
+    private readonly IValidator<CreateTechnicianReportRequest> _technicianReportValidator;
     private readonly IBlobStorageService _blobStorage;
     private readonly IQueueStorageService _queueStorage;
 
@@ -45,6 +47,8 @@ public sealed class TicketService : ITicketService
         IValidator<CreateTicketRequest> validator,
         IValidator<UpdateTicketRequest> updateValidator,
         IValidator<ResolveTicketRequest> resolveValidator,
+        IValidator<SubmitTicketFeedbackRequest> feedbackValidator,
+        IValidator<CreateTechnicianReportRequest> technicianReportValidator,
         IBlobStorageService blobStorage,
         IQueueStorageService queueStorage)
     {
@@ -60,6 +64,8 @@ public sealed class TicketService : ITicketService
         _validator = validator;
         _updateValidator = updateValidator;
         _resolveValidator = resolveValidator;
+        _feedbackValidator = feedbackValidator;
+        _technicianReportValidator = technicianReportValidator;
         _blobStorage = blobStorage;
         _queueStorage = queueStorage;
     }
@@ -423,6 +429,186 @@ public sealed class TicketService : ITicketService
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
 
+    public async Task<TicketDto> SubmitFeedbackAsync(
+        Guid id,
+        SubmitTicketFeedbackRequest request,
+        CancellationToken cancellationToken)
+    {
+        await ValidationHelper.ValidateAsync(_feedbackValidator, request, cancellationToken);
+
+        Ticket? ticket = await _tickets.GetClientTicketByIdAsync(
+            id,
+            _currentUser.CompanyId,
+            _currentUser.UserId,
+            cancellationToken);
+
+        if (ticket is null)
+        {
+            throw new NotFoundException($"El ticket con id {id} no existe.");
+        }
+
+        if (ticket.ResolvedAtUtc is null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Ticket"] = ["El ticket no está finalizado."]
+            });
+        }
+
+        if (ticket.Feedbacks.Any(feedback => feedback.CreatedAtUtc >= ticket.ResolvedAtUtc))
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Ticket"] = ["Ya respondiste a esta encuesta de satisfacción."]
+            });
+        }
+
+        TicketFeedback feedback = new()
+        {
+            Id = Guid.NewGuid(),
+            TicketId = ticket.Id,
+            ClientId = _currentUser.UserId,
+            WasSolved = request.WasSolved,
+            Rating = request.Rating,
+            Comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim(),
+            TechnicianId = ticket.AssignedToId
+        };
+
+        if (!request.WasSolved)
+        {
+            await ReopenTicketAsync(ticket, cancellationToken);
+        }
+
+        _tickets.AddFeedback(feedback);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(ticket.Id, cancellationToken);
+    }
+
+    public async Task<TicketDto> CreateTechnicianReportAsync(
+        Guid id,
+        CreateTechnicianReportRequest request,
+        CancellationToken cancellationToken)
+    {
+        await ValidationHelper.ValidateAsync(_technicianReportValidator, request, cancellationToken);
+
+        Ticket? ticket = await _tickets.GetClientTicketByIdAsync(
+            id,
+            _currentUser.CompanyId,
+            _currentUser.UserId,
+            cancellationToken);
+
+        if (ticket is null)
+        {
+            throw new NotFoundException($"El ticket con id {id} no existe.");
+        }
+
+        TicketFeedback? latestFeedback = ticket.Feedbacks
+            .OrderByDescending(feedback => feedback.CreatedAtUtc)
+            .FirstOrDefault();
+
+        if (latestFeedback is null
+            || latestFeedback.WasSolved
+            || latestFeedback.TechnicianId is null
+            || ticket.TechnicianReports.Any(report => report.CreatedAtUtc >= latestFeedback.CreatedAtUtc))
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Ticket"] = ["No hay una reapertura pendiente de reporte o ya enviaste un reporte por esta reapertura."]
+            });
+        }
+
+        TechnicianReport report = new()
+        {
+            Id = Guid.NewGuid(),
+            TicketId = ticket.Id,
+            ReportedById = _currentUser.UserId,
+            TechnicianId = latestFeedback.TechnicianId.Value,
+            Reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim()
+        };
+
+        List<string> uploadedBlobNames = new(request.Files.Count);
+
+        try
+        {
+            foreach (TicketFileUpload file in request.Files)
+            {
+                Guid attachmentId = Guid.NewGuid();
+                string blobName = BuildReportBlobName(_currentUser.CompanyId, ticket.Id, report.Id, attachmentId);
+
+                await _blobStorage.UploadAsync(
+                    blobName,
+                    file.Content,
+                    file.ContentType,
+                    cancellationToken);
+
+                uploadedBlobNames.Add(blobName);
+
+                report.Attachments.Add(new TechnicianReportAttachment
+                {
+                    Id = attachmentId,
+                    TechnicianReportId = report.Id,
+                    FileName = file.FileName,
+                    BlobName = blobName,
+                    ContentType = file.ContentType,
+                    SizeInBytes = file.SizeInBytes
+                });
+            }
+
+            _tickets.AddTechnicianReport(report);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            foreach (string blobName in uploadedBlobNames)
+            {
+                await _blobStorage.DeleteAsync(blobName, cancellationToken);
+            }
+
+            throw;
+        }
+
+        return await GetByIdAsync(ticket.Id, cancellationToken);
+    }
+
+    private async Task ReopenTicketAsync(Ticket ticket, CancellationToken cancellationToken)
+    {
+        TicketSlaRecord? currentSlaRecord = await _tickets.GetCurrentSlaRecordAsync(ticket.Id, cancellationToken);
+
+        if (currentSlaRecord is not null)
+        {
+            SlaPolicy.MarkCanceled(currentSlaRecord, DateTime.UtcNow);
+            currentSlaRecord.CanceledReason = SlaRecordCancelReason.ReopenedByClientFeedback;
+        }
+
+        Guid? nuevoStatusId = await _catalog.FindStatusByNameAsync(ticket.CompanyId, "Nuevo", cancellationToken);
+
+        if (nuevoStatusId is null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["StatusId"] = ["No se encontró el estado 'Nuevo' para tu empresa."]
+            });
+        }
+
+        ticket.AssignedToId = null;
+        ticket.StatusId = nuevoStatusId.Value;
+        ticket.ResolvedAtUtc = null;
+        ticket.StartedWorkAtUtc = null;
+
+        _tickets.AddComment(new TicketComment
+        {
+            Id = Guid.NewGuid(),
+            TicketId = ticket.Id,
+            AuthorId = null,
+            Body = "El cliente indicó que el problema no fue resuelto. El técnico fue desasignado " +
+                   "y el ticket queda pendiente de nueva asignación.",
+            IsInternal = true
+        });
+    }
+
     public async Task<AttachmentDownloadResult> DownloadAttachmentAsync(
         Guid ticketId,
         Guid attachmentId,
@@ -652,6 +838,9 @@ public sealed class TicketService : ITicketService
 
     private static string BuildBlobName(Guid companyId, Guid ticketId, Guid attachmentId) =>
         $"{companyId:N}/{ticketId:N}/{attachmentId:N}";
+
+    private static string BuildReportBlobName(Guid companyId, Guid ticketId, Guid reportId, Guid attachmentId) =>
+        $"{companyId:N}/{ticketId:N}/technician-reports/{reportId:N}/{attachmentId:N}";
 
     private async Task<IReadOnlyList<TicketDto>> EnrichWithSlaDataAsync(
         IReadOnlyList<TicketDto> tickets,
