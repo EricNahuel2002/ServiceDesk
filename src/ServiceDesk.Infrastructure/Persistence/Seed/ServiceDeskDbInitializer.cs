@@ -321,23 +321,23 @@ public sealed class ServiceDeskDbInitializer
         _context.Tickets.AddRange(ticket1, ticket2, ticket3, ticket4);
 
         _context.AuditLogs.AddRange(
-            CreateAuditLog(company.Id, cliente.Id, ticket1.Id, TicketAuditActions.Created, "Ticket creado",
+            CreateAuditLog(company.Id, cliente.Id, ticket1.Id, TicketAuditAction.Created.ToString(), "Ticket creado",
                 now.AddMinutes(-5)),
-            CreateAuditLog(company.Id, cliente.Id, ticket2.Id, TicketAuditActions.Created, "Ticket creado",
+            CreateAuditLog(company.Id, cliente.Id, ticket2.Id, TicketAuditAction.Created.ToString(), "Ticket creado",
                 now.AddHours(-2)),
-            CreateAuditLog(company.Id, cliente.Id, ticket2.Id, TicketAuditActions.Assigned, $"Asignado a {tecnico.FirstName} {tecnico.LastName}",
+            CreateAuditLog(company.Id, cliente.Id, ticket2.Id, TicketAuditAction.Assigned.ToString(), $"Asignado a {tecnico.FirstName} {tecnico.LastName}",
                 now.AddHours(-1)),
-            CreateAuditLog(company.Id, tecnico.Id, ticket2.Id, TicketAuditActions.WorkStarted, "Trabajo iniciado",
+            CreateAuditLog(company.Id, tecnico.Id, ticket2.Id, TicketAuditAction.WorkStarted.ToString(), "Trabajo iniciado",
                 now.AddMinutes(-30)),
-            CreateAuditLog(company.Id, cliente.Id, ticket3.Id, TicketAuditActions.Created, "Ticket creado",
+            CreateAuditLog(company.Id, cliente.Id, ticket3.Id, TicketAuditAction.Created.ToString(), "Ticket creado",
                 now.AddHours(-4)),
-            CreateAuditLog(company.Id, cliente.Id, ticket3.Id, TicketAuditActions.Assigned, $"Asignado a {tecnico.FirstName} {tecnico.LastName}",
+            CreateAuditLog(company.Id, cliente.Id, ticket3.Id, TicketAuditAction.Assigned.ToString(), $"Asignado a {tecnico.FirstName} {tecnico.LastName}",
                 now.AddHours(-3)),
-            CreateAuditLog(company.Id, tecnico.Id, ticket3.Id, TicketAuditActions.WorkStarted, "Trabajo iniciado",
+            CreateAuditLog(company.Id, tecnico.Id, ticket3.Id, TicketAuditAction.WorkStarted.ToString(), "Trabajo iniciado",
                 now.AddHours(-1)),
-            CreateAuditLog(company.Id, tecnico.Id, ticket3.Id, TicketAuditActions.Resolved, "Ticket cerrado",
+            CreateAuditLog(company.Id, tecnico.Id, ticket3.Id, TicketAuditAction.Resolved.ToString(), "Ticket cerrado",
                 now.AddMinutes(-30)),
-            CreateAuditLog(company.Id, cliente.Id, ticket4.Id, TicketAuditActions.Created, "Ticket creado",
+            CreateAuditLog(company.Id, cliente.Id, ticket4.Id, TicketAuditAction.Created.ToString(), "Ticket creado",
                 now.AddMinutes(-10)));
 
         _context.ChatMessages.AddRange(

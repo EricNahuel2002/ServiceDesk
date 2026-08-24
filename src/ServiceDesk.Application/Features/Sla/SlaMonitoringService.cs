@@ -1,5 +1,6 @@
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Notifications;
+using ServiceDesk.Domain;
 using ServiceDesk.Domain.Identity;
 using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
@@ -175,7 +176,7 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
 
             Guid? nuevoStatusId = await _catalog.FindStatusByNameAsync(
                 ticket.CompanyId,
-                "Nuevo",
+                TicketStatus.Nuevo.ToString(),
                 cancellationToken);
 
             if (nuevoStatusId is null)
@@ -240,7 +241,7 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
 
             Guid? nuevoStatusId = await _catalog.FindStatusByNameAsync(
                 ticket.CompanyId,
-                "Nuevo",
+                TicketStatus.Nuevo.ToString(),
                 cancellationToken);
 
             if (nuevoStatusId is null)

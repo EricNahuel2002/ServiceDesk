@@ -121,7 +121,7 @@ public sealed class AuditServiceTests : IDisposable
             CompanyId = _companyId,
             EntityType = "Ticket",
             EntityId = ticketId,
-            Action = TicketAuditActions.Created,
+            Action = TicketAuditAction.Created.ToString(),
             Description = "Ticket creado"
         });
         await _context.SaveChangesAsync();
@@ -133,7 +133,7 @@ public sealed class AuditServiceTests : IDisposable
             CompanyId = _companyId,
             EntityType = "Ticket",
             EntityId = ticketId,
-            Action = TicketAuditActions.WorkStarted,
+            Action = TicketAuditAction.WorkStarted.ToString(),
             Description = "Trabajo iniciado"
         });
         await _context.SaveChangesAsync();
@@ -142,8 +142,8 @@ public sealed class AuditServiceTests : IDisposable
             await _service.GetTicketHistoryAsync(ticketId, CancellationToken.None);
 
         Assert.Equal(2, history.Count);
-        Assert.Equal(TicketAuditActions.Created, history[0].Action);
-        Assert.Equal(TicketAuditActions.WorkStarted, history[1].Action);
+        Assert.Equal(TicketAuditAction.Created.ToString(), history[0].Action);
+        Assert.Equal(TicketAuditAction.WorkStarted.ToString(), history[1].Action);
     }
 
     [Fact]

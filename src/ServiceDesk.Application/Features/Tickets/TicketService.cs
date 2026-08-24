@@ -8,8 +8,8 @@ using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Application.Features.Tickets.Validators;
 using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Common;
-using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
+using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
 using ValidationException = ServiceDesk.Application.Common.Exceptions.ValidationException;
@@ -129,7 +129,7 @@ public sealed class TicketService : ITicketService
 
             _tickets.Add(ticket);
 
-            LogAudit(ticket, TicketAuditActions.Created, "Ticket creado", userId);
+            LogAudit(ticket, TicketAuditAction.Created.ToString(), "Ticket creado", userId);
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
@@ -227,7 +227,7 @@ public sealed class TicketService : ITicketService
         ticket.StartedWorkAtUtc = DateTime.UtcNow;
         ticket.StatusId = enProgresoStatusId.Value;
 
-        LogAudit(ticket, TicketAuditActions.WorkStarted, "Trabajo iniciado", _currentUser.UserId);
+        LogAudit(ticket, TicketAuditAction.WorkStarted.ToString(), "Trabajo iniciado", _currentUser.UserId);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -302,7 +302,7 @@ public sealed class TicketService : ITicketService
             });
         }
 
-        LogAudit(ticket, TicketAuditActions.Resolved, "Ticket cerrado", technician.Id, resolutionNote);
+        LogAudit(ticket, TicketAuditAction.Resolved.ToString(), "Ticket cerrado", technician.Id, resolutionNote);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -376,9 +376,9 @@ public sealed class TicketService : ITicketService
         {
             string technicianName = await GetTechnicianNameAsync(request.AssignedToId!.Value, cancellationToken);
             string action = previousAssignedToId.HasValue
-                ? TicketAuditActions.Reassigned
-                : TicketAuditActions.Assigned;
-            string description = action == TicketAuditActions.Reassigned
+                ? TicketAuditAction.Reassigned.ToString()
+                : TicketAuditAction.Assigned.ToString();
+            string description = action == TicketAuditAction.Reassigned.ToString()
                 ? $"Reasignado a {technicianName}"
                 : $"Asignado a {technicianName}";
 
@@ -445,9 +445,9 @@ public sealed class TicketService : ITicketService
         {
             string technicianName = await GetTechnicianNameAsync(request.AssignedToId, cancellationToken);
             string action = ticket.AssignedToId != request.AssignedToId && ticket.AssignedToId != null
-                ? TicketAuditActions.Reassigned
-                : TicketAuditActions.Assigned;
-            string description = action == TicketAuditActions.Reassigned
+                ? TicketAuditAction.Reassigned.ToString()
+                : TicketAuditAction.Assigned.ToString();
+            string description = action == TicketAuditAction.Reassigned.ToString()
                 ? $"Reasignado a {technicianName}"
                 : $"Asignado a {technicianName}";
 
@@ -516,7 +516,7 @@ public sealed class TicketService : ITicketService
 
             LogAudit(
                 ticket,
-                TicketAuditActions.Reopened,
+                TicketAuditAction.Reopened.ToString(),
                 "Reabierto por el cliente",
                 _currentUser.UserId,
                 string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim());
@@ -527,7 +527,7 @@ public sealed class TicketService : ITicketService
 
             LogAudit(
                 ticket,
-                TicketAuditActions.FeedbackSubmitted,
+                TicketAuditAction.FeedbackSubmitted.ToString(),
                 "Encuesta enviada",
                 _currentUser.UserId,
                 feedbackComment);
@@ -614,7 +614,7 @@ public sealed class TicketService : ITicketService
 
             LogAudit(
                 ticket,
-                TicketAuditActions.TechnicianReport,
+                TicketAuditAction.TechnicianReport.ToString(),
                 "Reporte técnico enviado",
                 _currentUser.UserId,
                 string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim());
