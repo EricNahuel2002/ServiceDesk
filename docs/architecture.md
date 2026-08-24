@@ -37,3 +37,8 @@ Antes de modificar arquitectura:
 La estructura física puede evolucionar a medida que crezcan los módulos. Preferir una organización por responsabilidad o módulo cuando el tamaño del proyecto lo justifique.
 
 No crear carpetas únicamente para satisfacer una estructura teórica.
+
+## Decisiones registradas
+
+Domain no conoce JSON ni System.Text.Json.
+La serialización JSON vive exclusivamente en Infrastructure.

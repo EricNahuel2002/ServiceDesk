@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -20,11 +19,6 @@ public sealed class ServiceDeskDbInitializer
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly ILogger<ServiceDeskDbInitializer> _logger;
-
-    private static readonly JsonSerializerOptions BusinessHoursJsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
 
     public ServiceDeskDbInitializer(
         ServiceDeskDbContext context,
@@ -103,22 +97,11 @@ public sealed class ServiceDeskDbInitializer
             new SlaConfiguration { CompanyId = company.Id, Priority = TicketPriority.Alta, ResponseTimeHours = 2 },
             new SlaConfiguration { CompanyId = company.Id, Priority = TicketPriority.Critica, ResponseTimeHours = 1 });
 
-        string businessHoursJson = JsonSerializer.Serialize(new Dictionary<string, DaySchedule>
-        {
-            ["Monday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
-            ["Tuesday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
-            ["Wednesday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
-            ["Thursday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
-            ["Friday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
-            ["Saturday"] = new() { Enabled = false },
-            ["Sunday"] = new() { Enabled = false }
-        }, BusinessHoursJsonOptions);
-
         _context.CompanyBusinessHours.Add(new CompanyBusinessHours
         {
             CompanyId = company.Id,
             TimeZoneId = "Argentina Standard Time",
-            BusinessHoursJson = businessHoursJson,
+            Schedule = WeeklySchedule.CreateDefault(),
             UseBusinessHours = true,
             MaxAssignmentToStartMinutes = 120
         });
@@ -165,22 +148,11 @@ public sealed class ServiceDeskDbInitializer
             return;
         }
 
-        string businessHoursJson = JsonSerializer.Serialize(new Dictionary<string, DaySchedule>
-        {
-            ["Monday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
-            ["Tuesday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
-            ["Wednesday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
-            ["Thursday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
-            ["Friday"] = new() { Enabled = true, Start = "08:00", End = "17:00" },
-            ["Saturday"] = new() { Enabled = false },
-            ["Sunday"] = new() { Enabled = false }
-        }, BusinessHoursJsonOptions);
-
         _context.CompanyBusinessHours.Add(new CompanyBusinessHours
         {
             CompanyId = companyId,
             TimeZoneId = "Argentina Standard Time",
-            BusinessHoursJson = businessHoursJson,
+            Schedule = WeeklySchedule.CreateDefault(),
             UseBusinessHours = true,
             MaxAssignmentToStartMinutes = 120
         });
