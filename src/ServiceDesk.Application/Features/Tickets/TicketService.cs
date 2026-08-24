@@ -95,53 +95,9 @@ public sealed class TicketService : ITicketService
             ResponseDeadlineAtUtc = responseDeadline
         };
 
-        List<TicketAttachment> attachments = new(request.Files.Count);
         List<string> uploadedBlobNames = new(request.Files.Count);
 
-        try
-        {
-            foreach (TicketFileUpload file in request.Files)
-            {
-                Guid attachmentId = Guid.NewGuid();
-                string blobName = BuildBlobName(companyId, ticket.Id, attachmentId);
-
-                await _blobStorage.UploadAsync(
-                    blobName,
-                    file.Content,
-                    file.ContentType,
-                    cancellationToken);
-
-                uploadedBlobNames.Add(blobName);
-
-                attachments.Add(new TicketAttachment
-                {
-                    Id = attachmentId,
-                    TicketId = ticket.Id,
-                    UploadedById = userId,
-                    FileName = file.FileName,
-                    BlobName = blobName,
-                    ContentType = file.ContentType,
-                    SizeInBytes = file.SizeInBytes
-                });
-            }
-
-            ticket.Attachments = attachments;
-
-            _tickets.Add(ticket);
-
-            LogAudit(ticket, TicketAuditAction.Created.ToString(), "Ticket creado", userId);
-
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-        }
-        catch
-        {
-            foreach (string blobName in uploadedBlobNames)
-            {
-                await _blobStorage.DeleteAsync(blobName, cancellationToken);
-            }
-
-            throw;
-        }
+        await ExecuteWithBlobRollbackAsync(uploadedBlobNames, () => UploadAndSaveTicketAsync(ticket, request, uploadedBlobNames, cancellationToken), cancellationToken);
 
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
@@ -584,52 +540,7 @@ public sealed class TicketService : ITicketService
 
         List<string> uploadedBlobNames = new(request.Files.Count);
 
-        try
-        {
-            foreach (TicketFileUpload file in request.Files)
-            {
-                Guid attachmentId = Guid.NewGuid();
-                string blobName = BuildReportBlobName(_currentUser.CompanyId, ticket.Id, report.Id, attachmentId);
-
-                await _blobStorage.UploadAsync(
-                    blobName,
-                    file.Content,
-                    file.ContentType,
-                    cancellationToken);
-
-                uploadedBlobNames.Add(blobName);
-
-                report.Attachments.Add(new TechnicianReportAttachment
-                {
-                    Id = attachmentId,
-                    TechnicianReportId = report.Id,
-                    FileName = file.FileName,
-                    BlobName = blobName,
-                    ContentType = file.ContentType,
-                    SizeInBytes = file.SizeInBytes
-                });
-            }
-
-            _tickets.AddTechnicianReport(report);
-
-            LogAudit(
-                ticket,
-                TicketAuditAction.TechnicianReport.ToString(),
-                "Reporte técnico enviado",
-                _currentUser.UserId,
-                string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim());
-
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-        }
-        catch
-        {
-            foreach (string blobName in uploadedBlobNames)
-            {
-                await _blobStorage.DeleteAsync(blobName, cancellationToken);
-            }
-
-            throw;
-        }
+        await ExecuteWithBlobRollbackAsync(uploadedBlobNames, () => UploadAndSaveTechnicianReportAsync(ticket, report, request, uploadedBlobNames, cancellationToken), cancellationToken);
 
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
@@ -914,6 +825,115 @@ public sealed class TicketService : ITicketService
 
     private static string BuildReportBlobName(Guid companyId, Guid ticketId, Guid reportId, Guid attachmentId) =>
         $"{companyId:N}/{ticketId:N}/technician-reports/{reportId:N}/{attachmentId:N}";
+
+    private async Task ExecuteWithBlobRollbackAsync(
+        List<string> uploadedBlobNames,
+        Func<Task> operation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await operation();
+        }
+        catch
+        {
+            await DeleteUploadedBlobsAsync(uploadedBlobNames, cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task DeleteUploadedBlobsAsync(List<string> blobNames, CancellationToken cancellationToken)
+    {
+        foreach (string blobName in blobNames)
+        {
+            await _blobStorage.DeleteAsync(blobName, cancellationToken);
+        }
+    }
+
+    private async Task UploadAndSaveTicketAsync(
+        Ticket ticket,
+        CreateTicketRequest request,
+        List<string> uploadedBlobNames,
+        CancellationToken cancellationToken)
+    {
+        List<TicketAttachment> attachments = new(request.Files.Count);
+
+        foreach (TicketFileUpload file in request.Files)
+        {
+            Guid attachmentId = Guid.NewGuid();
+            string blobName = BuildBlobName(ticket.CompanyId, ticket.Id, attachmentId);
+
+            await _blobStorage.UploadAsync(
+                blobName,
+                file.Content,
+                file.ContentType,
+                cancellationToken);
+
+            uploadedBlobNames.Add(blobName);
+
+            attachments.Add(new TicketAttachment
+            {
+                Id = attachmentId,
+                TicketId = ticket.Id,
+                UploadedById = _currentUser.UserId,
+                FileName = file.FileName,
+                BlobName = blobName,
+                ContentType = file.ContentType,
+                SizeInBytes = file.SizeInBytes
+            });
+        }
+
+        ticket.Attachments = attachments;
+
+        _tickets.Add(ticket);
+
+        LogAudit(ticket, TicketAuditAction.Created.ToString(), "Ticket creado", _currentUser.UserId);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task UploadAndSaveTechnicianReportAsync(
+        Ticket ticket,
+        TechnicianReport report,
+        CreateTechnicianReportRequest request,
+        List<string> uploadedBlobNames,
+        CancellationToken cancellationToken)
+    {
+        foreach (TicketFileUpload file in request.Files)
+        {
+            Guid attachmentId = Guid.NewGuid();
+            string blobName = BuildReportBlobName(ticket.CompanyId, ticket.Id, report.Id, attachmentId);
+
+            await _blobStorage.UploadAsync(
+                blobName,
+                file.Content,
+                file.ContentType,
+                cancellationToken);
+
+            uploadedBlobNames.Add(blobName);
+
+            report.Attachments.Add(new TechnicianReportAttachment
+            {
+                Id = attachmentId,
+                TechnicianReportId = report.Id,
+                FileName = file.FileName,
+                BlobName = blobName,
+                ContentType = file.ContentType,
+                SizeInBytes = file.SizeInBytes
+            });
+        }
+
+        _tickets.AddTechnicianReport(report);
+
+        LogAudit(
+            ticket,
+            TicketAuditAction.TechnicianReport.ToString(),
+            "Reporte técnico enviado",
+            _currentUser.UserId,
+            string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim());
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
 
     private void LogAudit(Ticket ticket, string action, string description, Guid? actorId, string? details = null)
     {
