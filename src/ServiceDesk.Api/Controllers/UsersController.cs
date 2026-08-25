@@ -24,6 +24,7 @@ public sealed class UsersController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<UserListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IReadOnlyList<UserListItemDto>>> GetUsers(
         CancellationToken cancellationToken)
@@ -36,7 +37,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -47,6 +48,6 @@ public sealed class UsersController : ControllerBase
     {
         AuthResponse response = await _authService.CreateUserAsync(request, cancellationToken);
 
-        return Ok(response);
+        return CreatedAtAction(nameof(GetUsers), new { }, response);
     }
 }
