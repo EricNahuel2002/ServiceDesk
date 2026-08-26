@@ -177,7 +177,7 @@ public sealed class AuthService : IAuthService
         CancellationToken cancellationToken)
     {
         IReadOnlyList<string> roles = await _identityService.GetRolesAsync(user, cancellationToken);
-        string role = roles.SingleOrDefault() ?? Roles.Cliente;
+        string role = roles.FirstOrDefault() ?? Roles.Cliente;
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
