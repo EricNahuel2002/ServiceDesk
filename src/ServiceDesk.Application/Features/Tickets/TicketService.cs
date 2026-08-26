@@ -6,9 +6,10 @@ using ServiceDesk.Application.Common.Validation;
 using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
 using ServiceDesk.Application.Features.Tickets.Validators;
+using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Common;
-using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Identity;
+using ServiceDesk.Domain.Enums;
 using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
 using ValidationException = ServiceDesk.Application.Common.Exceptions.ValidationException;
@@ -25,10 +26,11 @@ public sealed class TicketService : ITicketService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
     private readonly ICatalogVerificationService _catalogVerification;
-    private readonly IBusinessHoursCalculator _businessHoursCalculator;
     private readonly IValidator<CreateTicketRequest> _validator;
     private readonly IValidator<UpdateTicketRequest> _updateValidator;
     private readonly IValidator<ResolveTicketRequest> _resolveValidator;
+    private readonly IValidator<SubmitTicketFeedbackRequest> _feedbackValidator;
+    private readonly IValidator<CreateTechnicianReportRequest> _technicianReportValidator;
     private readonly IBlobStorageService _blobStorage;
     private readonly IQueueStorageService _queueStorage;
 
@@ -41,10 +43,11 @@ public sealed class TicketService : ITicketService
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUser,
         ICatalogVerificationService catalogVerification,
-        IBusinessHoursCalculator businessHoursCalculator,
         IValidator<CreateTicketRequest> validator,
         IValidator<UpdateTicketRequest> updateValidator,
         IValidator<ResolveTicketRequest> resolveValidator,
+        IValidator<SubmitTicketFeedbackRequest> feedbackValidator,
+        IValidator<CreateTechnicianReportRequest> technicianReportValidator,
         IBlobStorageService blobStorage,
         IQueueStorageService queueStorage)
     {
@@ -56,10 +59,11 @@ public sealed class TicketService : ITicketService
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _catalogVerification = catalogVerification;
-        _businessHoursCalculator = businessHoursCalculator;
         _validator = validator;
         _updateValidator = updateValidator;
         _resolveValidator = resolveValidator;
+        _feedbackValidator = feedbackValidator;
+        _technicianReportValidator = technicianReportValidator;
         _blobStorage = blobStorage;
         _queueStorage = queueStorage;
     }
@@ -91,51 +95,9 @@ public sealed class TicketService : ITicketService
             ResponseDeadlineAtUtc = responseDeadline
         };
 
-        List<TicketAttachment> attachments = new(request.Files.Count);
         List<string> uploadedBlobNames = new(request.Files.Count);
 
-        try
-        {
-            foreach (TicketFileUpload file in request.Files)
-            {
-                Guid attachmentId = Guid.NewGuid();
-                string blobName = BuildBlobName(companyId, ticket.Id, attachmentId);
-
-                await _blobStorage.UploadAsync(
-                    blobName,
-                    file.Content,
-                    file.ContentType,
-                    cancellationToken);
-
-                uploadedBlobNames.Add(blobName);
-
-                attachments.Add(new TicketAttachment
-                {
-                    Id = attachmentId,
-                    TicketId = ticket.Id,
-                    UploadedById = userId,
-                    FileName = file.FileName,
-                    BlobName = blobName,
-                    ContentType = file.ContentType,
-                    SizeInBytes = file.SizeInBytes
-                });
-            }
-
-            ticket.Attachments = attachments;
-
-            _tickets.Add(ticket);
-
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-        }
-        catch
-        {
-            foreach (string blobName in uploadedBlobNames)
-            {
-                await _blobStorage.DeleteAsync(blobName, cancellationToken);
-            }
-
-            throw;
-        }
+        await ExecuteWithBlobRollbackAsync(uploadedBlobNames, () => UploadAndSaveTicketAsync(ticket, request, uploadedBlobNames, cancellationToken), cancellationToken);
 
         return await GetByIdAsync(ticket.Id, cancellationToken);
     }
@@ -221,6 +183,8 @@ public sealed class TicketService : ITicketService
         ticket.StartedWorkAtUtc = DateTime.UtcNow;
         ticket.StatusId = enProgresoStatusId.Value;
 
+        LogAudit(ticket, TicketAuditAction.WorkStarted.ToString(), "Trabajo iniciado", _currentUser.UserId);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await EnqueueClientWorkNotificationAsync(ticket.Id, NotificationEvents.WorkStarted, cancellationToken);
@@ -278,17 +242,23 @@ public sealed class TicketService : ITicketService
         ticket.StatusId = closedStatusId.Value;
         ticket.ResolvedAtUtc = DateTime.UtcNow;
 
+        string? resolutionNote = null;
+
         if (!string.IsNullOrWhiteSpace(request.ResolutionNote))
         {
+            resolutionNote = request.ResolutionNote.Trim();
+
             _tickets.AddComment(new TicketComment
             {
                 Id = Guid.NewGuid(),
                 TicketId = ticket.Id,
                 AuthorId = technician.Id,
-                Body = request.ResolutionNote.Trim(),
+                Body = resolutionNote,
                 IsInternal = false
             });
         }
+
+        LogAudit(ticket, TicketAuditAction.Resolved.ToString(), "Ticket cerrado", technician.Id, resolutionNote);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -310,6 +280,8 @@ public sealed class TicketService : ITicketService
         {
             throw new NotFoundException($"El ticket con id {id} no existe.");
         }
+
+        Guid? previousAssignedToId = ticket.AssignedToId;
 
         if (request.AssignedToId.HasValue)
         {
@@ -354,6 +326,19 @@ public sealed class TicketService : ITicketService
         else
         {
             await DeactivateCurrentSlaRecordAsync(ticket, cancellationToken);
+        }
+
+        if (wasReassigned)
+        {
+            string technicianName = await GetTechnicianNameAsync(request.AssignedToId!.Value, cancellationToken);
+            string action = previousAssignedToId.HasValue
+                ? TicketAuditAction.Reassigned.ToString()
+                : TicketAuditAction.Assigned.ToString();
+            string description = action == TicketAuditAction.Reassigned.ToString()
+                ? $"Reasignado a {technicianName}"
+                : $"Asignado a {technicianName}";
+
+            LogAudit(ticket, action, description, _currentUser.UserId);
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -412,6 +397,19 @@ public sealed class TicketService : ITicketService
             await RefreshCurrentSlaRecordAsync(ticket, slaLimitHours, request.AssignedToId, cancellationToken);
         }
 
+        if (wasReassigned)
+        {
+            string technicianName = await GetTechnicianNameAsync(request.AssignedToId, cancellationToken);
+            string action = ticket.AssignedToId != request.AssignedToId && ticket.AssignedToId != null
+                ? TicketAuditAction.Reassigned.ToString()
+                : TicketAuditAction.Assigned.ToString();
+            string description = action == TicketAuditAction.Reassigned.ToString()
+                ? $"Reasignado a {technicianName}"
+                : $"Asignado a {technicianName}";
+
+            LogAudit(ticket, action, description, _currentUser.UserId);
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         if (wasReassigned)
@@ -421,6 +419,166 @@ public sealed class TicketService : ITicketService
         }
 
         return await GetByIdAsync(ticket.Id, cancellationToken);
+    }
+
+    public async Task<TicketDto> SubmitFeedbackAsync(
+        Guid id,
+        SubmitTicketFeedbackRequest request,
+        CancellationToken cancellationToken)
+    {
+        await ValidationHelper.ValidateAsync(_feedbackValidator, request, cancellationToken);
+
+        Ticket? ticket = await _tickets.GetClientTicketByIdAsync(
+            id,
+            _currentUser.CompanyId,
+            _currentUser.UserId,
+            cancellationToken);
+
+        if (ticket is null)
+        {
+            throw new NotFoundException($"El ticket con id {id} no existe.");
+        }
+
+        if (ticket.ResolvedAtUtc is null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Ticket"] = ["El ticket no está finalizado."]
+            });
+        }
+
+        if (ticket.Feedbacks.Any(feedback => feedback.CreatedAtUtc >= ticket.ResolvedAtUtc))
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Ticket"] = ["Ya respondiste a esta encuesta de satisfacción."]
+            });
+        }
+
+        TicketFeedback feedback = new()
+        {
+            Id = Guid.NewGuid(),
+            TicketId = ticket.Id,
+            ClientId = _currentUser.UserId,
+            WasSolved = request.WasSolved,
+            Rating = request.Rating,
+            Comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim(),
+            TechnicianId = ticket.AssignedToId
+        };
+
+        if (!request.WasSolved)
+        {
+            await ReopenTicketAsync(ticket, cancellationToken);
+
+            LogAudit(
+                ticket,
+                TicketAuditAction.Reopened.ToString(),
+                "Reabierto por el cliente",
+                _currentUser.UserId,
+                string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim());
+        }
+        else
+        {
+            string? feedbackComment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
+
+            LogAudit(
+                ticket,
+                TicketAuditAction.FeedbackSubmitted.ToString(),
+                "Encuesta enviada",
+                _currentUser.UserId,
+                feedbackComment);
+        }
+
+        _tickets.AddFeedback(feedback);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(ticket.Id, cancellationToken);
+    }
+
+    public async Task<TicketDto> CreateTechnicianReportAsync(
+        Guid id,
+        CreateTechnicianReportRequest request,
+        CancellationToken cancellationToken)
+    {
+        await ValidationHelper.ValidateAsync(_technicianReportValidator, request, cancellationToken);
+
+        Ticket? ticket = await _tickets.GetClientTicketByIdAsync(
+            id,
+            _currentUser.CompanyId,
+            _currentUser.UserId,
+            cancellationToken);
+
+        if (ticket is null)
+        {
+            throw new NotFoundException($"El ticket con id {id} no existe.");
+        }
+
+        TicketFeedback? latestFeedback = ticket.Feedbacks
+            .OrderByDescending(feedback => feedback.CreatedAtUtc)
+            .FirstOrDefault();
+
+        if (latestFeedback is null
+            || latestFeedback.WasSolved
+            || latestFeedback.TechnicianId is null
+            || ticket.TechnicianReports.Any(report => report.CreatedAtUtc >= latestFeedback.CreatedAtUtc))
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Ticket"] = ["No hay una reapertura pendiente de reporte o ya enviaste un reporte por esta reapertura."]
+            });
+        }
+
+        TechnicianReport report = new()
+        {
+            Id = Guid.NewGuid(),
+            TicketId = ticket.Id,
+            ReportedById = _currentUser.UserId,
+            TechnicianId = latestFeedback.TechnicianId.Value,
+            Reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim()
+        };
+
+        List<string> uploadedBlobNames = new(request.Files.Count);
+
+        await ExecuteWithBlobRollbackAsync(uploadedBlobNames, () => UploadAndSaveTechnicianReportAsync(ticket, report, request, uploadedBlobNames, cancellationToken), cancellationToken);
+
+        return await GetByIdAsync(ticket.Id, cancellationToken);
+    }
+
+    private async Task ReopenTicketAsync(Ticket ticket, CancellationToken cancellationToken)
+    {
+        TicketSlaRecord? currentSlaRecord = await _tickets.GetCurrentSlaRecordAsync(ticket.Id, cancellationToken);
+
+        if (currentSlaRecord is not null)
+        {
+            SlaPolicy.MarkCanceled(currentSlaRecord, DateTime.UtcNow);
+            currentSlaRecord.CanceledReason = SlaRecordCancelReason.ReopenedByClientFeedback;
+        }
+
+        Guid? nuevoStatusId = await _catalog.FindStatusByNameAsync(ticket.CompanyId, "Nuevo", cancellationToken);
+
+        if (nuevoStatusId is null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["StatusId"] = ["No se encontró el estado 'Nuevo' para tu empresa."]
+            });
+        }
+
+        ticket.AssignedToId = null;
+        ticket.StatusId = nuevoStatusId.Value;
+        ticket.ResolvedAtUtc = null;
+        ticket.StartedWorkAtUtc = null;
+
+        _tickets.AddComment(new TicketComment
+        {
+            Id = Guid.NewGuid(),
+            TicketId = ticket.Id,
+            AuthorId = null,
+            Body = "El cliente indicó que el problema no fue resuelto. El técnico fue desasignado " +
+                   "y el ticket queda pendiente de nueva asignación.",
+            IsInternal = true
+        });
     }
 
     public async Task<AttachmentDownloadResult> DownloadAttachmentAsync(
@@ -447,6 +605,18 @@ public sealed class TicketService : ITicketService
             ContentType = attachment.ContentType,
             FileName = attachment.FileName
         };
+    }
+
+    private async Task<string> GetTechnicianNameAsync(Guid technicianId, CancellationToken cancellationToken)
+    {
+        ApplicationUser? technician = await _users.GetByIdAsync(technicianId, cancellationToken);
+
+        if (technician is null)
+        {
+            return string.Empty;
+        }
+
+        return $"{technician.FirstName} {technician.LastName}".Trim();
     }
 
     private async Task<ApplicationUser> EnsureTechnicianValidAsync(Guid technicianId, CancellationToken cancellationToken)
@@ -491,7 +661,7 @@ public sealed class TicketService : ITicketService
             return;
         }
 
-        if (!_businessHoursCalculator.IsWithinBusinessHours(DateTime.UtcNow, businessHours))
+        if (!Domain.Sla.BusinessHoursCalculator.IsWithinBusinessHours(DateTime.UtcNow, businessHours))
         {
             throw new DomainRuleViolationException(
                 "Esta acción no se puede realizar fuera del horario laboral de la empresa.");
@@ -528,7 +698,7 @@ public sealed class TicketService : ITicketService
             return createdAtUtc.AddHours(slaConfig.ResponseTimeHours);
         }
 
-        return _businessHoursCalculator.AddBusinessHours(
+        return Domain.Sla.BusinessHoursCalculator.AddBusinessHours(
             createdAtUtc,
             slaConfig.ResponseTimeHours,
             businessHours);
@@ -652,6 +822,133 @@ public sealed class TicketService : ITicketService
 
     private static string BuildBlobName(Guid companyId, Guid ticketId, Guid attachmentId) =>
         $"{companyId:N}/{ticketId:N}/{attachmentId:N}";
+
+    private static string BuildReportBlobName(Guid companyId, Guid ticketId, Guid reportId, Guid attachmentId) =>
+        $"{companyId:N}/{ticketId:N}/technician-reports/{reportId:N}/{attachmentId:N}";
+
+    private async Task ExecuteWithBlobRollbackAsync(
+        List<string> uploadedBlobNames,
+        Func<Task> operation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await operation();
+        }
+        catch
+        {
+            await DeleteUploadedBlobsAsync(uploadedBlobNames, cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task DeleteUploadedBlobsAsync(List<string> blobNames, CancellationToken cancellationToken)
+    {
+        foreach (string blobName in blobNames)
+        {
+            await _blobStorage.DeleteAsync(blobName, cancellationToken);
+        }
+    }
+
+    private async Task UploadAndSaveTicketAsync(
+        Ticket ticket,
+        CreateTicketRequest request,
+        List<string> uploadedBlobNames,
+        CancellationToken cancellationToken)
+    {
+        List<TicketAttachment> attachments = new(request.Files.Count);
+
+        foreach (TicketFileUpload file in request.Files)
+        {
+            Guid attachmentId = Guid.NewGuid();
+            string blobName = BuildBlobName(ticket.CompanyId, ticket.Id, attachmentId);
+
+            await _blobStorage.UploadAsync(
+                blobName,
+                file.Content,
+                file.ContentType,
+                cancellationToken);
+
+            uploadedBlobNames.Add(blobName);
+
+            attachments.Add(new TicketAttachment
+            {
+                Id = attachmentId,
+                TicketId = ticket.Id,
+                UploadedById = _currentUser.UserId,
+                FileName = file.FileName,
+                BlobName = blobName,
+                ContentType = file.ContentType,
+                SizeInBytes = file.SizeInBytes
+            });
+        }
+
+        ticket.Attachments = attachments;
+
+        _tickets.Add(ticket);
+
+        LogAudit(ticket, TicketAuditAction.Created.ToString(), "Ticket creado", _currentUser.UserId);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task UploadAndSaveTechnicianReportAsync(
+        Ticket ticket,
+        TechnicianReport report,
+        CreateTechnicianReportRequest request,
+        List<string> uploadedBlobNames,
+        CancellationToken cancellationToken)
+    {
+        foreach (TicketFileUpload file in request.Files)
+        {
+            Guid attachmentId = Guid.NewGuid();
+            string blobName = BuildReportBlobName(ticket.CompanyId, ticket.Id, report.Id, attachmentId);
+
+            await _blobStorage.UploadAsync(
+                blobName,
+                file.Content,
+                file.ContentType,
+                cancellationToken);
+
+            uploadedBlobNames.Add(blobName);
+
+            report.Attachments.Add(new TechnicianReportAttachment
+            {
+                Id = attachmentId,
+                TechnicianReportId = report.Id,
+                FileName = file.FileName,
+                BlobName = blobName,
+                ContentType = file.ContentType,
+                SizeInBytes = file.SizeInBytes
+            });
+        }
+
+        _tickets.AddTechnicianReport(report);
+
+        LogAudit(
+            ticket,
+            TicketAuditAction.TechnicianReport.ToString(),
+            "Reporte técnico enviado",
+            _currentUser.UserId,
+            string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim());
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private void LogAudit(Ticket ticket, string action, string description, Guid? actorId, string? details = null)
+    {
+        _tickets.AddAuditLog(new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            UserId = actorId,
+            CompanyId = ticket.CompanyId,
+            EntityType = "Ticket",
+            EntityId = ticket.Id,
+            Action = action,
+            Description = description,
+            Details = details
+        });
+    }
 
     private async Task<IReadOnlyList<TicketDto>> EnrichWithSlaDataAsync(
         IReadOnlyList<TicketDto> tickets,

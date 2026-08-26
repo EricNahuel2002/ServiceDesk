@@ -1,5 +1,6 @@
 using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
+using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Application.Common.Interfaces;
@@ -20,6 +21,12 @@ public interface ITicketRepository
         Guid id,
         Guid companyId,
         Guid assignedToId,
+        CancellationToken cancellationToken = default);
+
+    Task<Ticket?> GetClientTicketByIdAsync(
+        Guid id,
+        Guid companyId,
+        Guid clientId,
         CancellationToken cancellationToken = default);
 
     Task<TicketNotificationInfo?> GetTicketNotificationInfoAsync(
@@ -57,4 +64,20 @@ public interface ITicketRepository
     void AddSlaRecord(TicketSlaRecord record);
 
     void AddComment(TicketComment comment);
+
+    void AddFeedback(TicketFeedback feedback);
+
+    void AddTechnicianReport(TechnicianReport report);
+
+    Task<IReadOnlyList<TicketDto>> GetAssignedToInCompanyAsync(
+        Guid assignedToId,
+        Guid companyId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AuditLog>> GetTicketAuditLogsAsync(
+        Guid ticketId,
+        Guid companyId,
+        CancellationToken cancellationToken = default);
+
+    void AddAuditLog(AuditLog auditLog);
 }

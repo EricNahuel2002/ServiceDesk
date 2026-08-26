@@ -30,3 +30,35 @@ Azure
 *  Queue Storage
 *  Azure Functions
 *  GitHub Actions
+
+# Ejecución Local
+
+Para levantar el proyecto localmente, sigue estos pasos:
+
+1. **Restaurar dependencias:**
+   ```bash
+   dotnet restore
+   ```
+
+2. **Construir el proyecto:**
+   ```bash
+   dotnet build
+   ```
+
+3. **Ejecutar la API:**
+   ```bash
+   dotnet run --project src/ServiceDesk.Api/ServiceDesk.Api.csproj
+   ```
+   La API estará disponible en `https://localhost:5001` y `http://localhost:5000`
+
+4. **Configurar la base de datos:**
+   - Asegúrate de tener SQL Server disponible
+   - Actualiza la cadena de conexión en `appsettings.Development.json`
+   - Aplica las migraciones:
+     ```bash
+     dotnet ef database update
+     ```
+
+5. **Variables de entorno:**
+   - Copia `appsettings.example.json` a `appsettings.Development.json`
+   - Completa las credenciales necesarias (JWT, Azure Key Vault, etc.)

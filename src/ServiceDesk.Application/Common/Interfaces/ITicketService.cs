@@ -33,6 +33,16 @@ public interface ITicketService
         AssignTicketRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<TicketDto> SubmitFeedbackAsync(
+        Guid id,
+        SubmitTicketFeedbackRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<TicketDto> CreateTechnicianReportAsync(
+        Guid id,
+        CreateTechnicianReportRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<AttachmentDownloadResult> DownloadAttachmentAsync(
         Guid ticketId,
         Guid attachmentId,

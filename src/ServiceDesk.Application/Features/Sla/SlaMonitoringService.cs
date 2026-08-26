@@ -1,5 +1,6 @@
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Notifications;
+using ServiceDesk.Domain;
 using ServiceDesk.Domain.Identity;
 using ServiceDesk.Domain.Sla;
 using ServiceDesk.Domain.Tickets;
@@ -175,7 +176,7 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
 
             Guid? nuevoStatusId = await _catalog.FindStatusByNameAsync(
                 ticket.CompanyId,
-                "Nuevo",
+                TicketStatus.Nuevo.ToString(),
                 cancellationToken);
 
             if (nuevoStatusId is null)
@@ -240,7 +241,7 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
 
             Guid? nuevoStatusId = await _catalog.FindStatusByNameAsync(
                 ticket.CompanyId,
-                "Nuevo",
+                TicketStatus.Nuevo.ToString(),
                 cancellationToken);
 
             if (nuevoStatusId is null)
@@ -460,8 +461,9 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
 
         int maxAssignmentToStartMinutes = businessHours?.MaxAssignmentToStartMinutes ?? 0;
 
-        DateTime startGraceDeadline = record.Ticket.AssignedAtUtc.Value
-            .AddMinutes(maxAssignmentToStartMinutes + SlaPolicy.AssignmentStartGraceMinutes);
+        DateTime? startGraceDeadline = record.CanceledReason == SlaRecordCancelReason.AssignmentStartGraceExceeded
+            ? record.Ticket.AssignedAtUtc.Value.AddMinutes(maxAssignmentToStartMinutes + SlaPolicy.AssignmentStartGraceMinutes)
+            : null;
 
         return new AdminReassignmentNotification
         {
@@ -469,6 +471,7 @@ public sealed class SlaMonitoringService : ISlaMonitoringService
             TicketId = record.TicketId,
             Title = record.Ticket.Title,
             PriorityName = record.Priority.ToString(),
+            CancelReason = record.CanceledReason!.Value,
             TechnicianFirstName = technician.FirstName,
             TechnicianLastName = technician.LastName,
             AssignedAtUtc = record.Ticket.AssignedAtUtc.Value,

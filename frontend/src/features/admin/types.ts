@@ -91,3 +91,11 @@ export interface DaySchedule {
   start: string | null
   end: string | null
 }
+
+export interface TicketAuditEventDto {
+  occurredAtUtc: string
+  action: string
+  description: string
+  details: string | null
+  actorName: string
+}

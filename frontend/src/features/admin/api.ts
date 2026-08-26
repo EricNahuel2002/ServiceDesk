@@ -4,10 +4,12 @@ import type {
   CreateCategoryRequest,
   UpdateCategoryRequest,
   CreateUserRequest,
+  TicketAuditEventDto,
 } from './types'
 import type { CategoryDto } from '../catalog/types'
 import type { UserListItemDto } from './types'
 import type { AdminMetricsDto } from './types'
+import type { ChatMessageDto } from '../chat/types'
 import type {
   SlaConfigurationDto,
   UpdateSlaConfigurationRequest,
@@ -84,4 +86,20 @@ export function getBusinessHours(): Promise<BusinessHoursDto> {
 
 export function updateBusinessHours(data: UpdateBusinessHoursRequest): Promise<BusinessHoursDto> {
   return apiClient.put<BusinessHoursDto>('/admin/sla/business-hours', data)
+}
+
+export function getAuditTechnicians(): Promise<TechnicianDto[]> {
+  return apiClient.get<TechnicianDto[]>('/admin/audits/technicians')
+}
+
+export function getAuditTechnicianTickets(technicianId: string): Promise<TicketDto[]> {
+  return apiClient.get<TicketDto[]>(`/admin/audits/technicians/${technicianId}/tickets`)
+}
+
+export function getAuditTicketHistory(ticketId: string): Promise<TicketAuditEventDto[]> {
+  return apiClient.get<TicketAuditEventDto[]>(`/admin/audits/tickets/${ticketId}/history`)
+}
+
+export function getAuditTicketChat(ticketId: string): Promise<ChatMessageDto[]> {
+  return apiClient.get<ChatMessageDto[]>(`/admin/audits/tickets/${ticketId}/chat`)
 }

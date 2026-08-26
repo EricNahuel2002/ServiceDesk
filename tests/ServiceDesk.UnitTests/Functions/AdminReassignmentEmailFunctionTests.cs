@@ -1,6 +1,7 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging.Abstractions;
 using ServiceDesk.Application.DTOs.Notifications;
+using ServiceDesk.Domain.Tickets;
 using ServiceDesk.Functions.Functions;
 using ServiceDesk.UnitTests.Fakes;
 
@@ -58,6 +59,55 @@ public sealed class AdminReassignmentEmailFunctionTests
         Assert.Equal(1, _slaMonitoring.AssignmentStartGraceExpirationsApplied);
         Assert.Empty(_email.Sent);
         Assert.Empty(_slaMonitoring.MarkedAdminReassignment);
+    }
+
+    [Fact]
+    public async Task Run_SendsReopenedByClientEmail_WhenReasonIsClientFeedback()
+    {
+        AdminReassignmentNotification notification = new()
+        {
+            RecordId = Guid.NewGuid(),
+            TicketId = Guid.NewGuid(),
+            Title = "Impresora rota",
+            PriorityName = "Media",
+            CancelReason = SlaRecordCancelReason.ReopenedByClientFeedback,
+            TechnicianFirstName = "Luis",
+            TechnicianLastName = "Pérez",
+            AssignedAtUtc = DateTime.UtcNow.AddMinutes(-200),
+            AdminEmails = ["ana@servicedesk.local"]
+        };
+        _slaMonitoring.AdminReassignmentNotifications = [notification];
+
+        await _function.Run(new TimerInfo(), CancellationToken.None);
+
+        string email = Assert.Single(_email.Sent).Body;
+        Assert.Contains("El cliente indicó", email);
+        Assert.DoesNotContain("Debía iniciar antes de", email);
+    }
+
+    [Fact]
+    public async Task Run_SendsGraceDeadlineEmail_WhenReasonIsAssignmentStartGrace()
+    {
+        AdminReassignmentNotification notification = new()
+        {
+            RecordId = Guid.NewGuid(),
+            TicketId = Guid.NewGuid(),
+            Title = "Impresora rota",
+            PriorityName = "Media",
+            CancelReason = SlaRecordCancelReason.AssignmentStartGraceExceeded,
+            TechnicianFirstName = "Luis",
+            TechnicianLastName = "Pérez",
+            AssignedAtUtc = DateTime.UtcNow.AddMinutes(-200),
+            StartGraceDeadlineUtc = DateTime.UtcNow.AddMinutes(-50),
+            AdminEmails = ["ana@servicedesk.local"]
+        };
+        _slaMonitoring.AdminReassignmentNotifications = [notification];
+
+        await _function.Run(new TimerInfo(), CancellationToken.None);
+
+        string email = Assert.Single(_email.Sent).Body;
+        Assert.Contains("no inició el trabajo", email);
+        Assert.Contains("Debía iniciar antes de", email);
     }
 
     [Fact]

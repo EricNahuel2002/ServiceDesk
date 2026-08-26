@@ -1,5 +1,7 @@
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Metrics;
+using ServiceDesk.Domain;
+using ServiceDesk.Domain.Enums;
 
 namespace ServiceDesk.Application.Features.Metrics;
 
@@ -170,9 +172,9 @@ public sealed class MetricsService : IMetricsService
 
     private static bool IsCancelled(TicketMetricsRecord t)
     {
-        return t.StatusName.Contains("Cancelado", StringComparison.OrdinalIgnoreCase)
-            || t.StatusName.Contains("Cancelled", StringComparison.OrdinalIgnoreCase)
-            || t.StatusName.Contains("Canceled", StringComparison.OrdinalIgnoreCase);
+        return t.StatusName == TicketStatus.Cancelado.ToString()
+            || t.StatusName == "Cancelled"
+            || t.StatusName == "Canceled";
     }
 
     private static bool IsOverdue(TicketMetricsRecord t)

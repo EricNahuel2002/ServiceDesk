@@ -33,6 +33,10 @@ public class ServiceDeskDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     public DbSet<TicketSlaRecord> TicketSlaRecords => Set<TicketSlaRecord>();
 
+    public DbSet<TicketFeedback> TicketFeedbacks => Set<TicketFeedback>();
+
+    public DbSet<TechnicianReport> TechnicianReports => Set<TechnicianReport>();
+
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Status> Statuses => Set<Status>();

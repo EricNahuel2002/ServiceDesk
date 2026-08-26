@@ -47,4 +47,8 @@ public class Ticket : BaseEntity
     public ICollection<TicketAttachment> Attachments { get; set; } = [];
 
     public ICollection<TicketSlaRecord> SlaRecords { get; set; } = [];
+
+    public ICollection<TicketFeedback> Feedbacks { get; set; } = [];
+
+    public ICollection<TechnicianReport> TechnicianReports { get; set; } = [];
 }

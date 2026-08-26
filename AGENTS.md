@@ -57,6 +57,36 @@ Reglas fundamentales:
 - No introducir dependencias entre capas que rompan la arquitectura.
 - Mantener las decisiones arquitectónicas documentadas en `docs/architecture.md`.
 
+## Comandos para levantar el proyecto
+
+Para levantar el proyecto en entorno de desarrollo:
+
+1. Restaurar paquetes:
+   ```bash
+   dotnet restore
+   ```
+
+2. Construir la solución:
+   ```bash
+   dotnet build
+   ```
+
+3. Aplicar migraciones de la base de datos:
+   ```bash
+   dotnet ef database update
+   ```
+
+4. Ejecutar la API:
+   ```bash
+   dotnet run --project src/ServiceDesk.Api/ServiceDesk.Api.csproj
+   ```
+   La API estará disponible en `https://localhost:5001` y `http://localhost:5000`
+
+5. Ejecutar pruebas:
+   ```bash
+   dotnet test
+   ```
+
 ## Stack
 
 - ASP.NET Core Web API

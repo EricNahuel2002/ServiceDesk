@@ -9,7 +9,7 @@ public class CompanyBusinessHours : BaseEntity
 
     public string TimeZoneId { get; set; } = string.Empty;
 
-    public string BusinessHoursJson { get; set; } = string.Empty;
+    public WeeklySchedule Schedule { get; set; } = WeeklySchedule.CreateDefault();
 
     public bool UseBusinessHours { get; set; } = true;
 

@@ -7,6 +7,12 @@ import { Select } from '../../components/common/Select'
 import { Textarea } from '../../components/common/Textarea'
 import { AppShell } from '../../components/layout/AppShell'
 import { useCategories } from '../../features/catalog/queries'
+import {
+  ALLOWED_FILE_TYPES,
+  MAX_FILES,
+  MAX_FILE_SIZE,
+  formatFileSize,
+} from '../../features/tickets/constants'
 import { useCreateTicket } from '../../features/tickets/queries'
 import { requireCliente } from '../../features/tickets/auth'
 import { ApiError } from '../../lib/apiClient'
@@ -16,18 +22,6 @@ export const Route = createFileRoute('/tickets/')({
   beforeLoad: () => requireCliente(),
   component: CreateTicketPage,
 })
-
-const MAX_FILES = 10
-const MAX_FILE_SIZE = 50 * 1024 * 1024
-
-const ALLOWED_FILE_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'video/mp4',
-  'video/webm',
-]
 
 interface FormErrors {
   title?: string
@@ -41,13 +35,6 @@ function getFieldError(payload: ApiErrorPayload | undefined, field: string): str
     (errorKey) => errorKey.toLowerCase() === field.toLowerCase(),
   )
   return key ? payload?.errors?.[key]?.[0] : undefined
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes >= 1024 * 1024) {
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
 function CreateTicketPage() {

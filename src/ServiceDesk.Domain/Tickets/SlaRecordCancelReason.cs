@@ -4,5 +4,7 @@ public enum SlaRecordCancelReason
 {
     SlaGraceExceeded = 0,
 
-    AssignmentStartGraceExceeded = 1
+    AssignmentStartGraceExceeded = 1,
+
+    ReopenedByClientFeedback = 2
 }

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using ServiceDesk.Domain.Sla;
+using ServiceDesk.Infrastructure.Persistence.Serialization;
 
 namespace ServiceDesk.Infrastructure.Persistence.Configurations;
 
@@ -15,7 +16,9 @@ public sealed class CompanyBusinessHoursConfiguration : IEntityTypeConfiguration
             .HasMaxLength(100)
             .IsRequired();
 
-        builder.Property(b => b.BusinessHoursJson)
+        builder.Property(b => b.Schedule)
+            .HasConversion(new WeeklyScheduleConverter())
+            .HasColumnName("BusinessHoursJson")
             .IsRequired();
 
         builder.HasOne(b => b.Company)

@@ -32,6 +32,7 @@ public sealed class CatalogController : ControllerBase
     [HttpGet("priorities")]
     [ProducesResponseType(typeof(IReadOnlyList<TicketPriority>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public ActionResult<IReadOnlyList<TicketPriority>> GetPriorities()
     {
         IReadOnlyList<TicketPriority> priorities =

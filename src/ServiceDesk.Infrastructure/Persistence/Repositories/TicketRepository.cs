@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ServiceDesk.Application.Common.Interfaces;
 using ServiceDesk.Application.DTOs.Notifications;
 using ServiceDesk.Application.DTOs.Tickets;
+using ServiceDesk.Domain.Audit;
 using ServiceDesk.Domain.Tickets;
 
 namespace ServiceDesk.Infrastructure.Persistence.Repositories;
@@ -39,6 +40,10 @@ public sealed class TicketRepository : ITicketRepository
         ResolvedAtUtc = ticket.ResolvedAtUtc.HasValue
             ? DateTime.SpecifyKind(ticket.ResolvedAtUtc.Value, DateTimeKind.Utc)
             : null,
+        HasPendingFeedback = ticket.ResolvedAtUtc != null
+            && ticket.Feedbacks.All(feedback => feedback.CreatedAtUtc < ticket.ResolvedAtUtc),
+        CanReportTechnician = ticket.Feedbacks.Any(feedback => !feedback.WasSolved
+            && ticket.TechnicianReports.All(report => report.CreatedAtUtc < feedback.CreatedAtUtc)),
         Attachments = ticket.Attachments
             .Select(attachment => new TicketAttachmentDto
             {
@@ -105,6 +110,19 @@ public sealed class TicketRepository : ITicketRepository
             .Where(ticket => ticket.Id == id
                 && ticket.CompanyId == companyId
                 && ticket.AssignedToId == assignedToId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<Ticket?> GetClientTicketByIdAsync(
+        Guid id,
+        Guid companyId,
+        Guid clientId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Tickets
+            .Where(ticket => ticket.Id == id
+                && ticket.CompanyId == companyId
+                && ticket.CreatedById == clientId)
+            .Include(ticket => ticket.Feedbacks)
+            .Include(ticket => ticket.TechnicianReports)
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<TicketNotificationInfo?> GetTicketNotificationInfoAsync(
@@ -186,7 +204,8 @@ public sealed class TicketRepository : ITicketRepository
             .Where(record => record.CanceledAtUtc != null
                 && record.CanceledNotifiedAtUtc == null
                 && record.TechnicianId != null
-                && record.CanceledReason != SlaRecordCancelReason.AssignmentStartGraceExceeded)
+                && record.CanceledReason != SlaRecordCancelReason.AssignmentStartGraceExceeded
+                && record.CanceledReason != SlaRecordCancelReason.ReopenedByClientFeedback)
             .Include(record => record.Ticket)
             .ToListAsync(cancellationToken);
 
@@ -194,8 +213,9 @@ public sealed class TicketRepository : ITicketRepository
         CancellationToken cancellationToken = default) =>
         await _context.TicketSlaRecords
             .Where(record => record.CanceledAtUtc != null
-                && record.CanceledReason == SlaRecordCancelReason.AssignmentStartGraceExceeded
-                && record.AdminReassignmentNotifiedAtUtc == null)
+                && record.AdminReassignmentNotifiedAtUtc == null
+                && (record.CanceledReason == SlaRecordCancelReason.AssignmentStartGraceExceeded
+                    || record.CanceledReason == SlaRecordCancelReason.ReopenedByClientFeedback))
             .Include(record => record.Ticket)
             .ToListAsync(cancellationToken);
 
@@ -204,4 +224,32 @@ public sealed class TicketRepository : ITicketRepository
     public void AddSlaRecord(TicketSlaRecord record) => _context.TicketSlaRecords.Add(record);
 
     public void AddComment(TicketComment comment) => _context.TicketComments.Add(comment);
+
+    public void AddFeedback(TicketFeedback feedback) => _context.TicketFeedbacks.Add(feedback);
+
+    public void AddTechnicianReport(TechnicianReport report) => _context.TechnicianReports.Add(report);
+
+    public async Task<IReadOnlyList<TicketDto>> GetAssignedToInCompanyAsync(
+        Guid assignedToId,
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await _context.Tickets
+            .AsNoTracking()
+            .Where(ticket => ticket.AssignedToId == assignedToId && ticket.CompanyId == companyId)
+            .OrderByDescending(ticket => ticket.CreatedAtUtc)
+            .Select(TicketProjection)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<AuditLog>> GetTicketAuditLogsAsync(
+        Guid ticketId,
+        Guid companyId,
+        CancellationToken cancellationToken = default) =>
+        await _context.AuditLogs
+            .AsNoTracking()
+            .Where(log => log.EntityId == ticketId && log.EntityType == "Ticket" && log.CompanyId == companyId)
+            .Include(log => log.User)
+            .OrderBy(log => log.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+    public void AddAuditLog(AuditLog auditLog) => _context.AuditLogs.Add(auditLog);
 }

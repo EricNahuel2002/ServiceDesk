@@ -16,19 +16,22 @@ public sealed class SlaService : ISlaService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IValidator<UpdateSlaConfigurationRequest> _slaValidator;
     private readonly IValidator<UpdateBusinessHoursRequest> _businessHoursValidator;
+    private readonly IWeeklyScheduleSerializer _scheduleSerializer;
 
     public SlaService(
         ISlaRepository slaRepository,
         ICurrentUserService currentUser,
         IUnitOfWork unitOfWork,
         IValidator<UpdateSlaConfigurationRequest> slaValidator,
-        IValidator<UpdateBusinessHoursRequest> businessHoursValidator)
+        IValidator<UpdateBusinessHoursRequest> businessHoursValidator,
+        IWeeklyScheduleSerializer scheduleSerializer)
     {
         _slaRepository = slaRepository;
         _currentUser = currentUser;
         _unitOfWork = unitOfWork;
         _slaValidator = slaValidator;
         _businessHoursValidator = businessHoursValidator;
+        _scheduleSerializer = scheduleSerializer;
     }
 
     public async Task<IReadOnlyList<SlaConfigurationDto>> GetSlaConfigurationsAsync(CancellationToken cancellationToken)
@@ -99,7 +102,7 @@ public sealed class SlaService : ISlaService
 
         return new BusinessHoursDto
         {
-            BusinessHoursJson = businessHours.BusinessHoursJson,
+            BusinessHoursJson = _scheduleSerializer.Serialize(businessHours.Schedule),
             TimeZoneId = businessHours.TimeZoneId,
             UseBusinessHours = businessHours.UseBusinessHours,
             MaxAssignmentToStartMinutes = businessHours.MaxAssignmentToStartMinutes
@@ -112,6 +115,18 @@ public sealed class SlaService : ISlaService
     {
         await ValidationHelper.ValidateAsync(_businessHoursValidator, request, cancellationToken);
 
+        if (!_scheduleSerializer.TryDeserialize(request.BusinessHoursJson, out WeeklySchedule? schedule)
+            || schedule is null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["businessHoursJson"] =
+                [
+                    "Los horarios de trabajo no son válidos. Debe incluir los 7 días, con horas en formato HH:mm y hora de inicio menor a la hora de fin."
+                ]
+            });
+        }
+
         CompanyBusinessHours? existing = await _slaRepository.GetBusinessHoursAsync(
             _currentUser.CompanyId,
             cancellationToken);
@@ -121,7 +136,7 @@ public sealed class SlaService : ISlaService
             CompanyBusinessHours newBusinessHours = new()
             {
                 CompanyId = _currentUser.CompanyId,
-                BusinessHoursJson = request.BusinessHoursJson,
+                Schedule = schedule,
                 TimeZoneId = request.TimeZoneId,
                 UseBusinessHours = request.UseBusinessHours,
                 MaxAssignmentToStartMinutes = request.MaxAssignmentToStartMinutes
@@ -131,7 +146,7 @@ public sealed class SlaService : ISlaService
         }
         else
         {
-            existing.BusinessHoursJson = request.BusinessHoursJson;
+            existing.Schedule = schedule;
             existing.TimeZoneId = request.TimeZoneId;
             existing.UseBusinessHours = request.UseBusinessHours;
             existing.MaxAssignmentToStartMinutes = request.MaxAssignmentToStartMinutes;
@@ -141,7 +156,7 @@ public sealed class SlaService : ISlaService
 
         return new BusinessHoursDto
         {
-            BusinessHoursJson = request.BusinessHoursJson,
+            BusinessHoursJson = _scheduleSerializer.Serialize(schedule),
             TimeZoneId = request.TimeZoneId,
             UseBusinessHours = request.UseBusinessHours,
             MaxAssignmentToStartMinutes = request.MaxAssignmentToStartMinutes

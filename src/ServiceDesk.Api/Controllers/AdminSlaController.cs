@@ -21,6 +21,7 @@ public sealed class AdminSlaController : ControllerBase
     [HttpGet("configurations")]
     [ProducesResponseType(typeof(IReadOnlyList<SlaConfigurationDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IReadOnlyList<SlaConfigurationDto>>> GetSlaConfigurations(
         CancellationToken cancellationToken)
@@ -33,6 +34,7 @@ public sealed class AdminSlaController : ControllerBase
     [ProducesResponseType(typeof(SlaConfigurationDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<SlaConfigurationDto>> UpdateSlaConfiguration(
         UpdateSlaConfigurationRequest request,
@@ -45,6 +47,7 @@ public sealed class AdminSlaController : ControllerBase
     [HttpGet("business-hours")]
     [ProducesResponseType(typeof(BusinessHoursDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<BusinessHoursDto>> GetBusinessHours(CancellationToken cancellationToken)
     {
@@ -56,6 +59,7 @@ public sealed class AdminSlaController : ControllerBase
     [ProducesResponseType(typeof(BusinessHoursDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<BusinessHoursDto>> UpdateBusinessHours(
         UpdateBusinessHoursRequest request,

@@ -12,6 +12,7 @@ using ServiceDesk.Domain.Identity;
 using ServiceDesk.Infrastructure.Persistence;
 using ServiceDesk.Infrastructure.Persistence.Repositories;
 using ServiceDesk.Infrastructure.Persistence.Seed;
+using ServiceDesk.Infrastructure.Persistence.Serialization;
 using ServiceDesk.Infrastructure.Services;
 
 namespace ServiceDesk.Infrastructure;
@@ -95,7 +96,8 @@ public static class DependencyInjection
         services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
         services.AddScoped<ISlaRepository, SlaRepository>();
         services.AddScoped<IMetricsRepository, MetricsRepository>();
-        services.AddScoped<IBusinessHoursCalculator, BusinessHoursCalculator>();
+        services.AddSingleton<IWeeklyScheduleSerializer, WeeklyScheduleJsonSerializer>();
+        
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<ServiceDeskDbInitializer>();
