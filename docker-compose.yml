@@ -1,0 +1,124 @@
+name: servicedesk
+
+x-azurite-connection-string: &azurite-connection-string
+  DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SA_PASSWORD:?Defina SA_PASSWORD en el archivo .env}
+    ports:
+      - "${SQL_PORT:-14333}:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -C -Q 'SELECT 1' -b
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    command:
+      - azurite
+      - --silent
+      - --location
+      - /data
+      - --blobHost
+      - 0.0.0.0
+      - --queueHost
+      - 0.0.0.0
+      - --tableHost
+      - 0.0.0.0
+    ports:
+      - "${AZURITE_BLOB_PORT:-10000}:10000"
+      - "${AZURITE_QUEUE_PORT:-10001}:10001"
+      - "${AZURITE_TABLE_PORT:-10002}:10002"
+    volumes:
+      - azurite-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:10000/devstoreaccount1?comp=list', r => { if (r.statusCode < 500) process.exit(0); process.exit(1); }).on('error', () => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: src/ServiceDesk.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Server=sql,1433;Database=ServiceDesk;User Id=sa;Password=${SA_PASSWORD:?Defina SA_PASSWORD en el archivo .env};TrustServerCertificate=True;MultipleActiveResultSets=true"
+      Jwt__SecretKey: ${JWT_SECRET:?Defina JWT_SECRET en el archivo .env (al menos 32 caracteres)}
+      BlobStorage__Enabled: "true"
+      BlobStorage__ConnectionString: *azurite-connection-string
+      BlobStorage__ContainerName: ticketsattachments
+      QueueStorage__Enabled: "true"
+      QueueStorage__ConnectionString: *azurite-connection-string
+    ports:
+      - "${API_PORT:-5216}:8080"
+    depends_on:
+      sql:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  functions:
+    build:
+      context: .
+      dockerfile: src/ServiceDesk.Functions/Dockerfile
+    environment:
+      AzureWebJobsStorage: *azurite-connection-string
+      FUNCTIONS_WORKER_RUNTIME: dotnet-isolated
+      ConnectionStrings__DefaultConnection: "Server=sql,1433;Database=ServiceDesk;User Id=sa;Password=${SA_PASSWORD:?Defina SA_PASSWORD en el archivo .env};TrustServerCertificate=True;MultipleActiveResultSets=true"
+      CommunicationServices__Enabled: "${ACS_ENABLED:-false}"
+      CommunicationServices__ConnectionString: "${ACS_CONNECTION_STRING:-}"
+      CommunicationServices__SenderAddress: "${ACS_SENDER_ADDRESS:-}"
+      CommunicationServices__SenderDisplayName: "${ACS_SENDER_DISPLAY_NAME:-ServiceDesk}"
+    depends_on:
+      sql:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      API_PROXY_TARGET: http://api:8080
+    command: ["pnpm", "dev", "--host"]
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  mssql-data:
+  azurite-data:
+  frontend-node-modules:
